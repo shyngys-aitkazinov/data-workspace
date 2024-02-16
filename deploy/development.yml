@@ -1,0 +1,16 @@
+# deploy/development.yml
+
+version: "3.4"
+
+services:
+  rabbit:
+    image: rabbitmq:management
+    restart: always
+    ports:
+      - 5672:5672
+      - 15672:15672
+    environment:
+      RABBITMQ_DEFAULT_USER: DEV_USER
+      RABBITMQ_DEFAULT_PASS: CHANGE_ME
+    logging:
+      driver: local

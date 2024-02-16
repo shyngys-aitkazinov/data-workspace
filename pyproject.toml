@@ -1,0 +1,42 @@
+[tool.poetry]
+name = "data-workspace"
+version = "0.1.0"
+description = "python workspace to support multiproject development"
+authors = ["Shyngys Aitkazinov <chikaphys9@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+packages = [
+    {include = "mousetrap/job_queue", from = "bases"},
+    {include = "mousetrap/fetch_data", from = "components"},
+    {include = "mousetrap/run_fetch_worker", from = "components"}
+]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+
+# mypy per-module options:
+[[tool.mypy.overrides]]
+module = "components.*"
+ignore_missing_imports = true
+
+
+[tool.poetry.dependencies]
+python = "^3.10"
+fastapi = "^0.109.2"
+uvicorn = "^0.27.1"
+pika = "^1.3.2"
+faker = "^23.2.0"
+
+
+[tool.poetry.group.dev.dependencies]
+pylint = "^3.0.3"
+isort = "^5.13.2"
+pytest = "^8.0.0"
+black = "^24.2.0"
+ipykernel = "^6.29.2"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
