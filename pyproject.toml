@@ -5,22 +5,6 @@ description = "python workspace to support multiproject development"
 authors = ["Shyngys Aitkazinov <chikaphys9@gmail.com>"]
 license = "MIT"
 readme = "README.md"
-packages = [
-    {include = "mousetrap/job_queue", from = "bases"},
-    {include = "mousetrap/fetch_data", from = "components"},
-    {include = "mousetrap/run_fetch_worker", from = "components"}
-]
-
-[tool.mypy]
-python_version = "3.10"
-warn_return_any = true
-warn_unused_configs = true
-
-# mypy per-module options:
-[[tool.mypy.overrides]]
-module = "components.*"
-ignore_missing_imports = true
-
 
 [tool.poetry.dependencies]
 python = "^3.10"
@@ -33,7 +17,8 @@ torchvision = "^0.17.1"
 torchaudio = "^2.2.1"
 matplotlib = "^3.8.3"
 gdown = "^5.1.0"
-
+scipy = "^1.13.0"
+pandas = "^2.2.2"
 
 [tool.poetry.group.dev.dependencies]
 pylint = "^3.0.3"
