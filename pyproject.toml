@@ -19,7 +19,6 @@ matplotlib = "^3.8.3"
 gdown = "^5.1.0"
 scipy = "^1.13.0"
 pandas = "^2.2.2"
-nltk = "^3.8.1"
 
 [tool.poetry.group.dev.dependencies]
 pylint = "^3.0.3"
@@ -27,6 +26,16 @@ isort = "^5.13.2"
 pytest = "^8.0.0"
 black = "^24.2.0"
 ipykernel = "^6.29.2"
+
+
+[tool.poetry.group.perception-dev.dependencies]
+h5py = "^3.11.0"
+
+[tool.poetry.group.challenges-dev.dependencies]
+nltk = "^3.8.1"
+
+[tool.black]
+line-length = 100
 
 [build-system]
 requires = ["poetry-core"]
