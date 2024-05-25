@@ -19,6 +19,7 @@ matplotlib = "^3.8.3"
 gdown = "^5.1.0"
 scipy = "^1.13.0"
 pandas = "^2.2.2"
+tensorboard = "^2.16.2"
 
 [tool.poetry.group.dev.dependencies]
 pylint = "^3.0.3"
@@ -30,6 +31,9 @@ ipykernel = "^6.29.2"
 
 [tool.poetry.group.perception-dev.dependencies]
 h5py = "^3.11.0"
+imageio = "^2.34.1"
+scikit-image = "^0.23.2"
+scikit-learn = "^1.5.0"
 
 [tool.poetry.group.challenges-dev.dependencies]
 nltk = "^3.8.1"
