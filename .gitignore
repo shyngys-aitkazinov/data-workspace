@@ -163,3 +163,5 @@ cython_debug/
 # datasets
 development/celeba
 development/FashionMNIST
+development/perception/*.h5
+development/perception/logs
