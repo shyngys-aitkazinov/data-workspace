@@ -130,6 +130,7 @@ class DatasetEncoding:
         features: pd.DataFrame,
         rollout: pd.DataFrame,
         holiday: pd.DataFrame,
+        start_training: pd.Timestamp,
         end_training: pd.Timestamp,
         start_forecast: pd.Timestamp,
         end_forecast: pd.Timestamp,
@@ -155,6 +156,7 @@ class DatasetEncoding:
         self.end_training = end_training
         self.start_forecast = start_forecast
         self.end_forecast = end_forecast
+        self.start_training = start_training
 
         self.customer_id_map = {int(col.split("_")[-1]): col for col in consumption.columns}
         self.rollout_id_map = {int(col.split("_")[-1]): col for col in rollout.columns}

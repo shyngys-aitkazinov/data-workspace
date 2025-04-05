@@ -63,12 +63,7 @@ def cross_validate_forecaster(
         mean_fold_port = portfolio_err
 
         # Example scoring formula (your logic may differ):
-        final_fold_score = (
-            1.0 * mean_fold_abs
-            + 5.0 * mean_fold_abs
-            + 10.0 * mean_fold_port
-            + 50.0 * mean_fold_port
-        )
+        final_fold_score = 1.0 * mean_fold_abs + 5.0 * mean_fold_abs + 10.0 * mean_fold_port + 50.0 * mean_fold_port
         # => 6.0 * mean_fold_abs + 60.0 * mean_fold_port
 
         all_absolute_errors.append(mean_fold_abs)
@@ -108,12 +103,7 @@ def evaluate(X: pd.DataFrame, y: pd.Series, save_path: str, my_predictor):
         save_path=save_path,  # not currently used to save anything, but left for clarity
     )
 
-    (abs_err,
-     port_err,
-     score,
-     abs_err_std,
-     port_err_std,
-     score_std) = results
+    (abs_err, port_err, score, abs_err_std, port_err_std, score_std) = results
 
     return abs_err, port_err, score, abs_err_std, port_err_std, score_std
 
@@ -143,6 +133,8 @@ def main(model_name: str, my_predictor, max_customers=10):
 
         # Data Manipulation and Training
         end_training = training_set.index.max()
+        start_training = training_set.index.max()
+
         start_forecast, end_forecast = example_results.index[0], example_results.index[-1]
 
         dataset_encoding = DatasetEncoding(
@@ -150,6 +142,7 @@ def main(model_name: str, my_predictor, max_customers=10):
             features,
             rollout,
             holidays,
+            start_training=start_training,
             end_training=end_training,
             start_forecast=start_forecast,
             end_forecast=end_forecast,
@@ -192,9 +185,7 @@ def main(model_name: str, my_predictor, max_customers=10):
             )
 
             # Evaluate
-            X, y = dataset_encoding.get_train_data(
-                df, customer_id, forecast_step=forecast_step, drop_nans_X=True
-            )
+            X, y = dataset_encoding.get_train_data(df, customer_id, forecast_step=forecast_step, drop_nans_X=True)
 
             (
                 abs_err,
@@ -276,6 +267,6 @@ def main(model_name: str, my_predictor, max_customers=10):
 
 if __name__ == "__main__":
     model_name = "elastic_net_predictor"
-    max_columns=100
-    predictor=elastic_net_predictor
+    max_columns = 100
+    predictor = elastic_net_predictor
     main(model_name, predictor, max_columns)
