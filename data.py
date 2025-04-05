@@ -2,6 +2,7 @@ from os.path import join
 
 import numpy as np
 import pandas as pd
+import pytz
 
 
 class DataLoader:
@@ -167,21 +168,29 @@ class DatasetEncoding:
             - Month (sin, cos)
             - Weekend (binary)
             - Holiday (binary)
-
-        Returns:
-            pd.DataFrame: DataFrame containing the generated time series features.
+            - Summer time / Winter time (binary)
         """
 
-        # Create an hourly date range
-        dt_index = pd.date_range(start=start_time, end=end_time, freq="1h")
+        # 1. Create an hourly date range (naive UTC, then convert to local) or directly local:
+        dt_index = pd.date_range(start=start_time, end=end_time, freq="1h", tz="Europe/Berlin")
+
+        # 2. Create a DataFrame with that index
         df = pd.DataFrame(index=dt_index)
 
-        # Hour of day
-        df["hour"] = df.index.hour
+        # 3. Convert to a timezone that observes DST
+        #    e.g., Europe/Berlin. Change as needed for your region.
+
+        # 4. is_summer_time feature
+        #    x.dst() will be non-zero (e.g. 1:00:00) in summer time.
+        df["is_summer_time"] = dt_index.map(lambda x: int(bool(x.dst())))
+
+        # ---------------------------------------
+        # Hour of day (0-23)
+        df["hour"] = dt_index.hour
         # Day of week: Monday=0, Sunday=6
-        df["day_of_week"] = df.index.dayofweek
+        df["day_of_week"] = dt_index.dayofweek
         # Month (1–12)
-        df["month"] = df.index.month
+        df["month"] = dt_index.month
 
         # Hour as sin/cos
         df["hour_sin"] = np.sin(2 * np.pi * df["hour"] / 24)
@@ -198,17 +207,15 @@ class DatasetEncoding:
         # Weekend (binary)
         df["is_weekend"] = df["day_of_week"].isin([5, 6]).astype(int)
 
-        # Holiday (binary)
-        # -- ensure holiday index is daily (no time component), and we compare by date only
-        # -- for example, if your holiday df uses the index as holiday dates:
-        holiday_dates = self.holiday.index.normalize()
-
-        # We can compare by normalizing df index's date
-        df["date_only"] = df.index.normalize()
+        # Example for 'holiday' detection
+        # --------------------------------
+        holiday_dates = self.holiday.index.normalize()  # e.g., 2025-01-01, etc.
+        df["date_only"] = dt_index.normalize()
         df["is_holiday"] = df["date_only"].isin(holiday_dates).astype(int)
 
-        # Drop helper columns if you want a clean final set
+        # Drop helper columns for cleanliness
         df.drop(["hour", "day_of_week", "month", "date_only"], axis=1, inplace=True)
+        df.index = df.index.tz_localize(None)
 
         return df
 
