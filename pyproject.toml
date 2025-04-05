@@ -28,6 +28,7 @@ numpy = "^2.2.4"
 pylint = "^3.0.3"
 isort = "^5.13.2"
 pytest = "^8.0.0"
+ruff = "^0.11.4"
 
 
 [tool.ruff]

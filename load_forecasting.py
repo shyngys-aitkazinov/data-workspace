@@ -3,7 +3,7 @@ import numpy as np
 from os.path import join
 
 # depending on your IDE, you might need to add datathon_eth. in front of data
-from data import DataLoader, SimpleEncoding
+from data import DataLoader, SimpleEncoding, DatasetEncoding
 
 # depending on your IDE, you might need to add datathon_eth. in front of forecast_models
 from forecast_models import SimpleModel
@@ -28,6 +28,10 @@ def main(zone: str):
     """
     EVERYTHING STARTING FROM HERE CAN BE MODIFIED.
     """
+    rollout, holidays =  loader.load_additional_data(zone)
+    # Add additional data to features
+    
+    
     team_name = "HANGUK_ML"
     # Data Manipulation and Training
     start_training = training_set.index.min()
