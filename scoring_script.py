@@ -10,7 +10,7 @@ testing_set_path = r"datasets2025"
 absolute_error = {}
 portfolio_error = {} 
 
-for team_name in ['OurCoolTeamName']:
+for team_name in ['HANGUK_ML']:
 
     try:
         for country in ['ES', 'IT']:
