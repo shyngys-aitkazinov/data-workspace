@@ -1,45 +1,28 @@
 [tool.poetry]
 name = "data-workspace"
 version = "0.1.0"
-description = "python workspace to support multiproject development"
+description = "python workspace for alpiq dev"
 authors = ["Shyngys Aitkazinov <chikaphys9@gmail.com>"]
 license = "MIT"
 readme = "README.md"
+packages = [{ include = "models" }]
 
 [tool.poetry.dependencies]
 python = "^3.10"
-fastapi = "^0.109.2"
-uvicorn = "^0.27.1"
-pika = "^1.3.2"
-faker = "^23.2.0"
 torch = "^2.2.1"
 torchvision = "^0.17.1"
 torchaudio = "^2.2.1"
 matplotlib = "^3.8.3"
-gdown = "^5.1.0"
 scipy = "^1.13.0"
 pandas = "^2.2.2"
-tensorboard = "^2.16.2"
-unidecode = "^1.3.8"
-rapidfuzz = "^3.10.1"
-hnswlib = "^0.8.0"
+scikit-learn = "^1.5.0"
+
 
 [tool.poetry.group.dev.dependencies]
 pylint = "^3.0.3"
 isort = "^5.13.2"
 pytest = "^8.0.0"
-black = "^24.2.0"
-ipykernel = "^6.29.2"
 
-
-[tool.poetry.group.perception-dev.dependencies]
-h5py = "^3.11.0"
-imageio = "^2.34.1"
-scikit-image = "^0.23.2"
-scikit-learn = "^1.5.0"
-
-[tool.poetry.group.challenges-dev.dependencies]
-nltk = "^3.8.1"
 
 [tool.ruff]
 line-length = 120
@@ -48,11 +31,16 @@ target-version = "py310"
 [tool.ruff.lint]
 # select = ["E", "F", "W", "Q", "UP", "I", "N"]
 select = ["E", "F", "UP", "I"]
-ignore = ['F401', "UP015"]
+ignore = ["F401", "UP015", "F541"]
+
+[tool.ruff.format]
+quote-style = "double"       # Optional: enforce double quotes
+indent-style = "space"       # Optional: use spaces instead of tabs
 
 [tool.mypy]
 no_implicit_optional = true
 check_untyped_defs = true
+ignore_missing_imports = true
 
 
 [build-system]
