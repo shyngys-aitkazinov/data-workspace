@@ -4,3 +4,5 @@
 {"model": "elastic_net_predictor", "zone": "IT", "final_score": 468.6041586258895}
 {"model": "elastic_net_predictor", "zone": "ES", "final_score": 9104.022669975717}
 {"model": "elastic_net_predictor", "zone": "IT", "final_score": 468.6041586258895}
+{"model": "elastic_net_predictor", "final_score": 8655.120002377957, "std_abs_err": 568.4445228161128}
+{"model": "elastic_net_predictor", "final_score": 8655.120002377957, "std_abs_err": 40.39759315760613}

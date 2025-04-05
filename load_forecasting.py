@@ -8,20 +8,18 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import TimeSeriesSplit
 
-# from data import DataLoader, DatasetEncoding, SimpleEncoding
-# from forecast_models import SimpleModel, elastic_net_predictor
+# depending on your IDE, you might need to add datathon_eth. in front of data
+from data import DataLoader, DatasetEncoding, SimpleEncoding
 
-def evaluate_forecast(y_true: pd.Series, y_pred: pd.Series):
-    """
-    Returns:
-      - country_error: sum of absolute differences (abs err)
-      - portfolio_country_error: absolute sum of the *signed* differences (port err)
-      - raw_errors: the vector of raw (y_pred - y_true) for stdev calculations
-    """
+# depending on your IDE, you might need to add datathon_eth. in front of forecast_models
+from forecast_models import SimpleModel, elastic_net_predictor
+
+
+def evaluate_forecast(y_true, y_pred):
     diff = y_pred - y_true
     country_error = diff.abs().sum()
-    portfolio_country_error = diff.sum()  # signed sum
-    return country_error, abs(portfolio_country_error), diff  # also return raw diffs
+    portfolio_country_error = diff.sum()
+    return country_error, abs(portfolio_country_error)
 
 
 def cross_validate_forecaster(
@@ -35,20 +33,13 @@ def cross_validate_forecaster(
     """
     Perform time-series cross-validation.
     Returns:
-      mean_abs_err,
-      mean_port_err,
-      mean_final_score,
-      all_fold_diffs (the concatenation of raw errors for each fold),
-        so you can compute an overall stdev as needed
+      mean_abs_err, mean_port_err, mean_final_score,
+      std_abs_err,  std_port_err,  std_final_score
     """
     tscv = TimeSeriesSplit(n_splits=n_splits)
-
-    all_absolute_errors = []  # store fold-wise sum of absolute errors
-    all_portfolio_errors = [] # store fold-wise sum of portfolio errors
+    all_absolute_errors = []
+    all_portfolio_errors = []
     fold_scores = []
-    
-    # We'll also keep track of the raw differences from each fold
-    all_fold_diffs = []  # (this will be a list of arrays/vectors)
 
     for fold, (train_idx, test_idx) in enumerate(tscv.split(y.index), start=1):
         train_dates = pd.to_datetime(y.index[train_idx])
@@ -65,198 +56,226 @@ def cross_validate_forecaster(
 
         y_hat = predictor(X_train, y_train, X_test)
 
-        country_err, portfolio_err, raw_diffs = evaluate_forecast(y_test, y_hat)
+        country_err, portfolio_err = evaluate_forecast(y_test, y_hat)
 
-        mean_fold_abs = country_err  # sum of absolute errors for that fold
+        # Sum of absolute errors for that fold
+        mean_fold_abs = country_err
         mean_fold_port = portfolio_err
 
         # Example scoring formula (your logic may differ):
-        final_fold_score = 6.0 * mean_fold_abs + 60.0 * mean_fold_port
+        final_fold_score = (
+            1.0 * mean_fold_abs
+            + 5.0 * mean_fold_abs
+            + 10.0 * mean_fold_port
+            + 50.0 * mean_fold_port
+        )
+        # => 6.0 * mean_fold_abs + 60.0 * mean_fold_port
 
-        # Save sums for stats
         all_absolute_errors.append(mean_fold_abs)
         all_portfolio_errors.append(mean_fold_port)
         fold_scores.append(final_fold_score)
 
-        # Save raw diffs for stdev
-        all_fold_diffs.append(raw_diffs.values)
-
-        if verbose:
-            print(f"\n✅ Fold {fold} completed")
-            print(f"   ├─ Mean Absolute Error (this fold):  {mean_fold_abs:.2f}")
-            print(f"   ├─ Mean Portfolio Error (this fold): {mean_fold_port:.2f}")
-            print(f"   └─ Final Fold Score: {np.round(final_fold_score, 2)}")
-
     # Final metrics across folds
-    mean_absolute_error = np.mean(all_absolute_errors)
-    mean_portfolio_error = np.mean(all_portfolio_errors)
+    mean_abs_err = np.mean(all_absolute_errors)
+    mean_port_err = np.mean(all_portfolio_errors)
     mean_final_score = np.mean(fold_scores)
 
-    # Concatenate the list of raw_diffs into one big array
-    # so you can compute the stdev of all errors across folds
-    if len(all_fold_diffs) > 0:
-        all_fold_diffs = np.concatenate(all_fold_diffs)  # shape: (sum of test sizes,)
-    else:
-        # Just in case there's no data
-        all_fold_diffs = np.array([])
+    std_abs_err = np.std(all_absolute_errors)
+    std_port_err = np.std(all_portfolio_errors)
+    std_final_score = np.std(fold_scores)
 
-    return mean_absolute_error, mean_portfolio_error, mean_final_score, all_fold_diffs
+    return (
+        mean_abs_err,
+        mean_port_err,
+        mean_final_score,
+        std_abs_err,
+        std_port_err,
+        std_final_score,
+    )
 
 
-def evaluate(X: pd.DataFrame, y: pd.Series, save_path: str, predictor: Callable):
+def evaluate(X: pd.DataFrame, y: pd.Series, save_path: str, my_predictor):
     """
-    Runs cross-validation with a given predictor and returns:
-      abs_err, port_err, score, all_diffs (raw differences)
+    Runs cross-validation with a given predictor.
+    Returns:
+      abs_err, port_err, score, abs_err_std, port_err_std, score_std
     """
-    abs_err, port_err, score, raw_diffs = cross_validate_forecaster(
-        predictor=predictor,
+    results = cross_validate_forecaster(
+        predictor=my_predictor,
         X=X,
         y=y,
         verbose=True,
-        save_path=save_path,  # not currently used to save anything
+        save_path=save_path,  # not currently used to save anything, but left for clarity
     )
-    return abs_err, port_err, score, raw_diffs
+
+    (abs_err,
+     port_err,
+     score,
+     abs_err_std,
+     port_err_std,
+     score_std) = results
+
+    return abs_err, port_err, score, abs_err_std, port_err_std, score_std
 
 
-def main(model_name: str):
+def main(model_name: str, my_predictor, max_customers=10):
     """
-    Train and evaluate the models for IT and ES.
-    
-    Instead of writing to JSON twice (once per zone),
-    we will accumulate results and produce *one* final JSON record.
-    
-    The final JSON record will have:
-      - "final_score": sum of the final scores from both zones
-      - "std_errors": standard deviation across *all* errors from both zones
+    Train and evaluate the models for IT and ES,
+    then store one final score (sum of ES and IT),
+    and also store the std dev of all absolute errors across both zones.
     """
 
-    # For demonstration, let's just define a dummy predictor here
-    # that always returns y_train.mean() as a constant forecast.
-    # In your real code, you would import from forecast_models, e.g. `elastic_net_predictor`
-    def dummy_predictor(X_train, y_train, X_test):
-        return pd.Series(y_train.mean(), index=X_test.index)
+    # We'll accumulate each zone's results in memory
+    zone_final_scores = {}
+    zone_errors_dataframes = {}
 
-    zones = ['ES', 'IT']
-    
-    # We'll accumulate the zone final scores, and *all* raw diffs across zones
-    zone_scores = []
-    global_diffs = []  # hold all raw error values from all folds/customers across zones
-    
-    for zone in zones:
-        print(f"\n=== Processing zone: {zone} ===\n")
+    for zone in ["ES", "IT"]:
+        # Inputs
+        input_path = r"datasets2025"
+        output_path = r"outputs"
 
-        # -------------------------------------------------
-        # In your real code, replace these next lines with:
-        # loader = DataLoader(input_path)
-        # training_set, features, example_results = loader.load_data(zone)
-        # rollout, holidays = loader.load_additional_data(zone)
-        # ...
-        # For a minimal example, let's define dummy data:
-        dates = pd.date_range("2020-01-01", periods=200, freq="H")
-        training_set = pd.DataFrame({
-            f"consumption_{i}": np.random.rand(len(dates)) * 100
-            for i in range(1, 6)  # 5 "customers" as example
-        }, index=dates)
-        # Just treat X = time features and y = consumption for simplicity:
-        features = training_set.copy()  # dummy
-        # -------------------------------------------------
+        # Load Datasets
+        loader = DataLoader(input_path)
+        training_set, features, example_results = loader.load_data(zone)
 
-        # Prepare an output DataFrame to track per-customer errors
-        errors = pd.DataFrame(columns=["abs_err", "port_err", "std_err", "country", "score"])
+        # Additional data
+        rollout, holidays = loader.load_additional_data(zone)
 
-        # Evaluate each "customer" consumption column
-        for costumer in training_set.columns.values:
+        # Data Manipulation and Training
+        end_training = training_set.index.max()
+        start_forecast, end_forecast = example_results.index[0], example_results.index[-1]
+
+        dataset_encoding = DatasetEncoding(
+            training_set,
+            features,
+            rollout,
+            holidays,
+            end_training=end_training,
+            start_forecast=start_forecast,
+            end_forecast=end_forecast,
+        )
+
+        range_forecast = pd.date_range(start=start_forecast, end=end_forecast, freq="1H")
+        forecast = pd.DataFrame(columns=training_set.columns, index=range_forecast)
+        forecast_step = 1
+
+        # We'll store one row per-customer
+        errors = pd.DataFrame(
+            columns=[
+                "abs_err",
+                "port_err",
+                "abs_err_std",
+                "port_err_std",
+                # We'll add "raw_cv_score" and "raw_cv_score_std" if we want to keep them
+                "cv_score",
+                "cv_score_std",
+                "country",
+            ]
+        )
+
+        customers = training_set.columns.values[:max_customers]
+
+        for i, costumer in enumerate(customers, start=1):
             customer_id = int(costumer.split("_")[-1])
-            print(f"----------------------------------------")
-            print(f"Start customer {customer_id} (zone={zone})")
+            # Progress bar
+            bar_length = 30
+            progress = int(bar_length * i / max_customers)
+            bar = "#" * progress + "-" * (bar_length - progress)
+            print(f"\r[{bar}] {i}/{max_customers} customers processed", end="", flush=True)
 
-            # Build X, y for cross-validation from your real pipeline
-            # In your actual code, you'd do something like:
-            #   df = dataset_encoding.generate_dataset(...)
-            #   X, y = dataset_encoding.get_train_data(...)
-            # For demonstration, let's define:
-            y = training_set[costumer]
-            X = features.drop(columns=[col for col in training_set.columns
-                                       if col != costumer])  # just pretend
-
-            # Run cross-validation
-            abs_err, port_err, cv_score, raw_diffs = evaluate(
-                X, y,
-                save_path=f"outputs/{customer_id}.png",  # in real usage
-                predictor=dummy_predictor  # in real usage: elastic_net_predictor
+            df = dataset_encoding.generate_dataset(
+                customer_id,
+                window_size=24 * 7,
+                forecast_skip=1,
+                forecast_horizon=1,
+                additional_feats=["mean", "std", "skew", "kurtosis", "min", "max"],
             )
 
-            # If you want a single stdev across folds for this customer,
-            # compute it from `raw_diffs`:
-            customer_std = float(np.ste(raw_diffs)) if len(raw_diffs) > 0 else np.nan
+            # Evaluate
+            X, y = dataset_encoding.get_train_data(
+                df, customer_id, forecast_step=forecast_step, drop_nans_X=True
+            )
 
-            # Weighted scoring example (same logic as your code):
-            # If zone=ES => (abs_err * 5 + port_err * 50)
-            # If zone=IT => (abs_err * 1 + port_err * 10)
-            if zone == 'ES':
-                cust_score = abs_err * 5 + port_err * 50
-            else:  # IT
-                cust_score = abs_err * 1 + port_err * 10
+            (
+                abs_err,
+                port_err,
+                cv_score,
+                abs_err_std,
+                port_err_std,
+                cv_score_std,
+            ) = evaluate(X, y, f"{output_path}/{customer_id}.png", my_predictor)
 
-            # Add row to our "errors" DataFrame
             errors.loc[customer_id] = {
                 "abs_err": abs_err,
                 "port_err": port_err,
-                "std_err": customer_std,
+                "abs_err_std": abs_err_std,
+                "port_err_std": port_err_std,
+                "cv_score": cv_score,
+                "cv_score_std": cv_score_std,
                 "country": zone,
-                "score": cust_score
             }
 
-            # We'll also add these raw differences to the global list
-            # so that at the very end, we can compute overall stdev across
-            # *all* predictions for both zones:
-            global_diffs.append(raw_diffs)
+        # Now compute final "score" per-customer with the zone-specific weighting
+        # (Stays the same as before, purely example logic).
+        errors["score"] = errors.apply(
+            lambda x: (x["abs_err"] * 5 + x["port_err"] * 50)
+            if x["country"] == "ES"
+            else (x["abs_err"] * 1 + x["port_err"] * 10),
+            axis=1,
+        )
 
         # Save the CSV for this zone
-        errors.to_csv(f"errors_{zone}.csv", index=True)
+        errors.to_csv(f"{output_path}/errors_{zone}.csv")
 
-        # We'll keep track of the *mean* final score for the zone (across customers):
-        zone_final_score = float(errors['score'].mean())
-        zone_scores.append(zone_final_score)
+        # Final "average score" across all customers for THIS zone
+        final_score_zone = float(errors["score"].mean())
+        zone_final_scores[zone] = final_score_zone
 
-        print(f"\n===== ZONE: {zone} =====")
-        print(f"Final average score (zone): {zone_final_score:.2f}")
-        print("=============\n")
+        # Keep the DataFrame in memory for post-processing
+        zone_errors_dataframes[zone] = errors
 
-    # Now we have the final average scores from both zones. Sum them:
-    total_score = sum(zone_scores)
+        print(f"\n\n===== ZONE: {zone} =====")
+        print(f"Final average score: {final_score_zone:.2f}")
+        print("========================\n")
 
-    # Compute the global stdev across *all* raw diffs from both zones
-    if len(global_diffs) > 0:
-        global_diffs = np.concatenate(global_diffs)
-        global_stdev = float(np.std(global_diffs))
-    else:
-        global_stdev = float('nan')
+    # -----------------------
+    # After processing both zones, we compute:
+    #  1) A single final score = sum of the ES and IT final scores
+    #  2) The overall std of all absolute errors across *both* zones
+    # -----------------------
+    final_score = zone_final_scores["ES"] + zone_final_scores["IT"]
+    combined_errors = pd.concat(zone_errors_dataframes.values())
 
-    print("\n==========================")
-    print("✅ All zones processed!")
-    print(f"   Single final_score = {total_score:.2f}")
-    print(f"   Global stdev of all errors = {global_stdev:.4f}")
-    print("==========================")
+    # "The standard deviation of all errors" typically means the std of abs_err across the entire dataset
+    overall_std_abs_err = float(combined_errors["abs_err"].std(ddof=1) / np.sqrt(len(combined_errors)))
 
-    # Write *one* record to JSON
+    # Build one single record for the JSON
     record = {
         "model": model_name,
-        "final_score": total_score,   # sum of zone scores
-        "std_errors": global_stdev,   # stdev across all diffs
+        # single final score (sum of zone-specific final scores)
+        "final_score": final_score,
+        # standard deviation of all absolute errors across ES & IT
+        "std_abs_err": overall_std_abs_err,
     }
 
+    # You might also decide to store "std of score" or portfolio errors here.
+    # For example:
+    # record["std_score"] = float(combined_errors["score"].std())
+
+    # Append to results.json (as one line)
     with open("results.json", "a", encoding="utf-8") as f:
-        json.dump(record, f, ensure_ascii=False)
+        json.dump(record, f)
         f.write("\n")
+
+    print("===== FINAL COMBINED =====")
+    print(f"Model: {model_name}")
+    print(f"Final Summed Score (ES+IT): {final_score:.2f}")
+    print(f"Std of all absolute errors: {overall_std_abs_err:.2f}")
+    print("========================\n")
 
 
 if __name__ == "__main__":
-    import sys
-
-    if len(sys.argv) > 1:
-        model_name = sys.argv[1]
-    else:
-        model_name = "elastic_net_predictor"
-
-    main(model_name)
+    model_name = "elastic_net_predictor"
+    max_columns=100
+    predictor=elastic_net_predictor
+    main(model_name, predictor, max_columns)
