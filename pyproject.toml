@@ -40,8 +40,8 @@ select = ["E", "F", "UP", "I"]
 ignore = ["F401", "UP015", "F541"]
 
 [tool.ruff.format]
-quote-style = "double"       # Optional: enforce double quotes
-indent-style = "space"       # Optional: use spaces instead of tabs
+quote-style = "double" # Optional: enforce double quotes
+indent-style = "space" # Optional: use spaces instead of tabs
 
 [tool.mypy]
 no_implicit_optional = true
