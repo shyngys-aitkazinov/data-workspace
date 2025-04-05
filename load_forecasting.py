@@ -141,6 +141,10 @@ def evaluate(X: pd.DataFrame, y: pd.Series, save_path: str):
     return abs_err, port_err, score
 
 
+def autoregression():
+    pass
+
+
 def main(zone: str):
     """
 
@@ -185,6 +189,8 @@ def main(zone: str):
     errors = pd.DataFrame(
         columns=["abs_err", "port_err", "score"],
     )
+
+    models = dict()
 
     for costumer in training_set.columns.values:
         customer_id = int(costumer.split("_")[-1])
