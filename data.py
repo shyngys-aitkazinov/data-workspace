@@ -222,6 +222,7 @@ class DatasetEncoding:
         start_time: pd.Timestamp = None,
         end_time: pd.Timestamp = None,
         include_time_features: bool = True,
+        additional_feats: list[str] = [],
     ) -> pd.DataFrame:
         """
         Generate a supervised dataset for a single customer.
@@ -341,7 +342,64 @@ class DatasetEncoding:
         latest_valid_row = len(df) - (forecast_skip + forecast_horizon - 1)
         df = df.iloc[earliest_valid_row:latest_valid_row]
 
+        add_dict = {}
+        for add_feat in additional_feats:
+            if add_feat == "mean":
+                add_dict["rolling_mean"] = df["consumption"].rolling(window=window_size).mean()
+            elif add_feat == "std":
+                add_dict["rolling_std"] = df["consumption"].rolling(window=window_size).std()
+            elif add_feat == "kurtosis":
+                add_dict["rolling_kurtosis"] = df["consumption"].rolling(window=window_size).kurt()
+            elif add_feat == "skew":
+                add_dict["rolling_skew"] = df["consumption"].rolling(window=window_size).skew()
+            elif add_feat == "min":
+                add_dict["rolling_min"] = df["consumption"].rolling(window=window_size).min()
+            elif add_feat == "max":
+                add_dict["rolling_max"] = df["consumption"].rolling(window=window_size).max()
+            else:
+                # Possibly it's a direct column name in self.features (or some external field)
+                # If it's in df already, do nothing. If it's in self.features, we can explicitly join here.
+                # For simplicity, we assume it's already joined above if it's in self.features or rollout.
+                # If you want to handle it differently, you can do so here.
+                if add_feat not in df.columns:
+                    print(f"Warning: '{add_feat}' not recognized as a stat or existing column.")
+                    # Optionally do: add_dict[add_feat] = self.features[add_feat].loc[start_time:end_time]
+
+        # Concat all newly created additional features at once
+        if add_dict:
+            add_stats_df = pd.DataFrame(add_dict, index=df.index)
+            df = pd.concat([df, add_stats_df], axis=1)
+
         # ------------------------------------------------------
         # 6) Return the final DataFrame
         # ------------------------------------------------------
         return df
+
+    def get_train_data(
+        self,
+        df: pd.DataFrame,
+        customer_id: int,
+        forecast_step: int,
+        interpolate_limit: int = 1,
+        drop_nans_X: bool = False,
+    ) -> tuple[pd.DataFrame, pd.Series]:
+        target_column = f"{customer_id}_future_{forecast_step}"
+
+        # Perform linear interpolation on the "target" column
+        df[target_column] = df[target_column].interpolate(
+            method="time", limit=interpolate_limit, limit_direction="both", limit_area="inside"
+        )
+
+        if drop_nans_X:
+            futures = [col for col in df.columns if col.startswith(f"{customer_id}_future_") and col != target_column]
+            df = df.drop(columns=futures).dropna(axis=0)
+            y = df[target_column]
+            X = df.drop(columns=target_column)
+        else:
+            mask = df[target_column].notna()
+            y = df[target_column][mask]
+
+            to_drop = [col for col in df.columns if col.startswith(f"{customer_id}_future_")]
+            X = df[mask].drop(columns=to_drop)
+
+        return X, y
