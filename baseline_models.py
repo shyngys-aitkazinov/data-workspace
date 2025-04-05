@@ -192,3 +192,5 @@ class naive2:
         print("Candidate (week ago) range starts at:", candidate_range_week[0])
 
         return forecast
+
+
