@@ -1,13 +1,131 @@
+from collections.abc import Callable
 from os.path import join
+from typing import Optional
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from sklearn.model_selection import TimeSeriesSplit
 
 # depending on your IDE, you might need to add datathon_eth. in front of data
 from data import DataLoader, DatasetEncoding, SimpleEncoding
 
 # depending on your IDE, you might need to add datathon_eth. in front of forecast_models
-from forecast_models import SimpleModel
+from forecast_models import SimpleModel, elastic_net_predictor
+
+
+def evaluate_forecast(y_true, y_pred):
+    diff = y_pred - y_true
+    country_error = diff.abs().sum()
+    portfolio_country_error = diff.sum()
+    return country_error, abs(portfolio_country_error)
+
+
+def cross_validate_forecaster(
+    predictor: Callable,
+    X: pd.DataFrame,
+    y: pd.Series,
+    verbose=True,
+    save_path=None,
+    n_splits=5,
+):
+    tscv = TimeSeriesSplit(n_splits=n_splits)
+    all_absolute_errors = []
+    all_portfolio_errors = []
+    fold_scores = []
+
+    for fold, (train_idx, test_idx) in enumerate(tscv.split(y.index), start=1):
+        train_dates = pd.to_datetime(y.index[train_idx])
+        test_dates = pd.to_datetime(y.index[test_idx])
+
+        fold_abs_error = []
+        fold_port_error = []
+
+        if verbose:
+            print(f"\n📦 Fold {fold}/{n_splits}")
+            print(f"├─ Train range: {train_dates[0]} → {train_dates[-1]}  ({len(train_idx)} samples)")
+            print(f"└─ Test  range: {test_dates[0]} → {test_dates[-1]}  ({len(test_idx)} samples)")
+
+        y_train = y.loc[train_dates]
+        y_test = y.loc[test_dates]
+
+        X_train = X[train_idx]
+        X_test = X[test_idx]
+
+        if verbose:
+            print("   ┌── Data shapes for first customer:")
+            print(f"   │   X_train: {X_train.shape} | y_train: {y_train.shape}")
+            print(f"   │   X_test : {X_test.shape} | y_test : {y_test.shape}")
+            print("   └──────────────────────────────")
+
+        if len(y_test) == 0:
+            continue
+
+        y_hat = predictor(X_train, y_train, X_test)
+
+        country_err, portfolio_err = evaluate_forecast(y_test, y_hat)
+        fold_abs_error.append(country_err)
+        fold_port_error.append(portfolio_err)
+
+        mean_fold_abs = np.mean(fold_abs_error)
+        mean_fold_port = np.mean(fold_port_error)
+        final_fold_score = 1.0 * mean_fold_abs + 5.0 * mean_fold_abs + 10.0 * mean_fold_port + 50.0 * mean_fold_port
+
+        all_absolute_errors.append(mean_fold_abs)
+        all_portfolio_errors.append(mean_fold_port)
+        fold_scores.append(final_fold_score)
+
+        if verbose:
+            print(f"\n✅ Fold {fold} completed")
+            print(f"   ├─ Mean Absolute Error (per customer):  {mean_fold_abs:.2f}")
+            print(f"   ├─ Mean Portfolio Error (per customer): {mean_fold_port:.2f}")
+            print(f"   └─ Final Fold Score: {np.round(final_fold_score, 2)}")
+
+    # Final metrics
+    mean_absolute_error = np.mean(all_absolute_errors)
+    mean_portfolio_error = np.mean(all_portfolio_errors)
+    final_score = np.mean(fold_scores)
+
+    print("\n📊 Cross-Validation Summary")
+    print(f"   ├─ Mean Absolute Error:  {mean_absolute_error:.2f}")
+    print(f"   ├─ Mean Portfolio Error: {mean_portfolio_error:.2f}")
+    print(f"   └─ Final CV Forecast Score: {np.round(final_score, 0)}")
+
+    # Plot histograms
+    fig, axs = plt.subplots(1, 3, figsize=(15, 4))
+    axs[0].hist(all_absolute_errors, bins=n_splits, color="skyblue")
+    axs[0].set_title("Mean Absolute Error per Fold")
+    axs[0].set_xlabel("Absolute Error")
+    axs[0].set_ylabel("Count")
+
+    axs[1].hist(all_portfolio_errors, bins=n_splits, color="orange")
+    axs[1].set_title("Mean Portfolio Error per Fold")
+    axs[1].set_xlabel("Portfolio Error")
+
+    axs[2].hist(fold_scores, bins=n_splits, color="green")
+    axs[2].set_title("Final Score per Fold")
+    axs[2].set_xlabel("Final Score")
+
+    plt.tight_layout()
+
+    if save_path:
+        plt.savefig(save_path)
+        print(f"\n📁 Histogram saved to {save_path}")
+    else:
+        plt.show()
+
+    return mean_absolute_error, mean_portfolio_error, final_score
+
+
+def evaluate(training_set, features):
+    # abs_err, port_err, score = cross_validate_forecaster(simple_predictor, training_set, features)
+    abs_err, port_err, score = cross_validate_forecaster(
+        predictor=elastic_net_predictor,
+        training_set=training_set,
+        features=features,
+        verbose=True,
+        save_path=f"/Users/alexanders/datathon_2025/outputs/{country}_cv_histograms.png",  # or None to just show the plot
+    )
 
 
 def main(zone: str):
