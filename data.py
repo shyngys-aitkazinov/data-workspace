@@ -192,6 +192,14 @@ class DatasetEncoding:
         # Month (1–12)
         df["month"] = dt_index.month
 
+        for h in range(23):
+            df[f"hour_{h}"] = (df["hour"] == h).astype(int)
+
+        # Manual one-hot for day of week (0–6)
+        for d in range(6):
+            df[f"dow_{d}"] = (df["day_of_week"] == d).astype(int)
+
+
         # Hour as sin/cos
         df["hour_sin"] = np.sin(2 * np.pi * df["hour"] / 24)
         df["hour_cos"] = np.cos(2 * np.pi * df["hour"] / 24)
