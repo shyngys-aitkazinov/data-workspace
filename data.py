@@ -222,6 +222,7 @@ class DatasetEncoding:
         start_time: pd.Timestamp = None,
         end_time: pd.Timestamp = None,
         include_time_features: bool = True,
+        additional_feats: list[str] = [],
     ) -> pd.DataFrame:
         """
         Generate a supervised dataset for a single customer.
@@ -340,6 +341,34 @@ class DatasetEncoding:
         earliest_valid_row = window_size  # because lag_n needs that many back steps
         latest_valid_row = len(df) - (forecast_skip + forecast_horizon - 1)
         df = df.iloc[earliest_valid_row:latest_valid_row]
+
+        add_dict = {}
+        for add_feat in additional_feats:
+            if add_feat == "mean":
+                add_dict["rolling_mean"] = df["consumption"].rolling(window=window_size).mean()
+            elif add_feat == "std":
+                add_dict["rolling_std"] = df["consumption"].rolling(window=window_size).std()
+            elif add_feat == "kurtosis":
+                add_dict["rolling_kurtosis"] = df["consumption"].rolling(window=window_size).kurt()
+            elif add_feat == "skew":
+                add_dict["rolling_skew"] = df["consumption"].rolling(window=window_size).skew()
+            elif add_feat == "min":
+                add_dict["rolling_min"] = df["consumption"].rolling(window=window_size).min()
+            elif add_feat == "max":
+                add_dict["rolling_max"] = df["consumption"].rolling(window=window_size).max()
+            else:
+                # Possibly it's a direct column name in self.features (or some external field)
+                # If it's in df already, do nothing. If it's in self.features, we can explicitly join here.
+                # For simplicity, we assume it's already joined above if it's in self.features or rollout.
+                # If you want to handle it differently, you can do so here.
+                if add_feat not in df.columns:
+                    print(f"Warning: '{add_feat}' not recognized as a stat or existing column.")
+                    # Optionally do: add_dict[add_feat] = self.features[add_feat].loc[start_time:end_time]
+
+        # Concat all newly created additional features at once
+        if add_dict:
+            add_stats_df = pd.DataFrame(add_dict, index=df.index)
+            df = pd.concat([df, add_stats_df], axis=1)
 
         # ------------------------------------------------------
         # 6) Return the final DataFrame
