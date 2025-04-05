@@ -91,28 +91,39 @@ def cross_validate_forecaster(
     print(f"   ├─ Mean Portfolio Error: {mean_portfolio_error:.2f}")
     print(f"   └─ Final CV Forecast Score: {np.round(final_score, 0)}")
 
-    # Plot histograms
-    fig, axs = plt.subplots(1, 3, figsize=(15, 4))
-    axs[0].hist(all_absolute_errors, bins=n_splits, color="skyblue")
-    axs[0].set_title("Mean Absolute Error per Fold")
-    axs[0].set_xlabel("Absolute Error")
-    axs[0].set_ylabel("Count")
+    # print("FOLD_SCORES!!==========================")
+    # print(fold_scores)
 
-    axs[1].hist(all_portfolio_errors, bins=n_splits, color="orange")
-    axs[1].set_title("Mean Portfolio Error per Fold")
-    axs[1].set_xlabel("Portfolio Error")
+    # Create 1 row, 3 columns canvas
+    fig, axs = plt.subplots(1, 3, figsize=(18, 5))
 
-    axs[2].hist(fold_scores, bins=n_splits, color="green")
-    axs[2].set_title("Final Score per Fold")
-    axs[2].set_xlabel("Final Score")
+    # Plot 1: Fold Scores
+    axs[0].plot(range(1, len(fold_scores) + 1), fold_scores, marker='o', linestyle='-')
+    axs[0].set_title('Fold Scores')
+    axs[0].set_xlabel('Fold')
+    axs[0].set_ylabel('Score')
+    axs[0].grid(True)
+
+    # Plot 2: Absolute Errors
+    axs[1].plot(range(1, len(all_absolute_errors) + 1), all_absolute_errors, marker='o', linestyle='-')
+    axs[1].set_title('Absolute Errors')
+    axs[1].set_xlabel('Fold')
+    axs[1].set_ylabel('Absolute Error')
+    axs[1].grid(True)
+
+    # Plot 3: Portfolio Errors
+    axs[2].plot(range(1, len(all_portfolio_errors) + 1), all_portfolio_errors, marker='o', linestyle='-')
+    axs[2].set_title('Portfolio Errors')
+    axs[2].set_xlabel('Fold')
+    axs[2].set_ylabel('Portfolio Error')
+    axs[2].grid(True)
 
     plt.tight_layout()
 
+    # Save the plot
     if save_path:
-        plt.savefig(save_path)
-        print(f"\n📁 Histogram saved to {save_path}")
-    else:
-        plt.show()
+        plt.savefig(save_path, bbox_inches='tight')
+    plt.close()
 
     return mean_absolute_error, mean_portfolio_error, final_score
 
