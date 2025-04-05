@@ -74,3 +74,12 @@ def elastic_net_predictor(X_train, y_train, X_future):
     model.fit(X_train, y_train)
 
     return model.predict(X_future)
+
+
+def lgbm_predictor(X_train, y_train, X_future):
+
+    model = LightGBMModel()
+
+    model.train(X_train, y_train)
+
+    return model.predict(X_future)
