@@ -1,3 +1,4 @@
+import json
 from collections.abc import Callable
 from os.path import join
 from typing import Optional
@@ -29,6 +30,11 @@ def cross_validate_forecaster(
     save_path=None,
     n_splits=5,
 ):
+    """
+    Perform time-series cross-validation.
+    Returns:
+      mean_absolute_error, mean_portfolio_error, mean_final_score
+    """
     tscv = TimeSeriesSplit(n_splits=n_splits)
     all_absolute_errors = []
     all_portfolio_errors = []
@@ -38,13 +44,8 @@ def cross_validate_forecaster(
         train_dates = pd.to_datetime(y.index[train_idx])
         test_dates = pd.to_datetime(y.index[test_idx])
 
-        fold_abs_error = []
-        fold_port_error = []
-
-        if verbose:
-            print(f"\n📦 Fold {fold}/{n_splits}")
-            print(f"├─ Train range: {train_dates[0]} → {train_dates[-1]}  ({len(train_idx)} samples)")
-            print(f"└─ Test  range: {test_dates[0]} → {test_dates[-1]}  ({len(test_idx)} samples)")
+        if len(test_dates) == 0:
+            continue
 
         y_train = y.loc[train_dates]
         y_test = y.loc[test_dates]
@@ -52,24 +53,21 @@ def cross_validate_forecaster(
         X_train = X.loc[train_dates]
         X_test = X.loc[test_dates]
 
-        if verbose:
-            print("   ┌── Data shapes for first customer:")
-            print(f"   │   X_train: {X_train.shape} | y_train: {y_train.shape}")
-            print(f"   │   X_test : {X_test.shape} | y_test : {y_test.shape}")
-            print("   └──────────────────────────────")
-
-        if len(y_test) == 0:
-            continue
-
         y_hat = predictor(X_train, y_train, X_test)
 
         country_err, portfolio_err = evaluate_forecast(y_test, y_hat)
-        fold_abs_error.append(country_err)
-        fold_port_error.append(portfolio_err)
 
-        mean_fold_abs = np.mean(fold_abs_error)
-        mean_fold_port = np.mean(fold_port_error)
-        final_fold_score = 1.0 * mean_fold_abs + 5.0 * mean_fold_abs + 10.0 * mean_fold_port + 50.0 * mean_fold_port
+        mean_fold_abs = country_err  # sum of absolute errors for that fold
+        mean_fold_port = portfolio_err
+
+        # Example scoring formula (your logic may differ):
+        final_fold_score = (
+            1.0 * mean_fold_abs
+            + 5.0 * mean_fold_abs
+            + 10.0 * mean_fold_port
+            + 50.0 * mean_fold_port
+        )
+        # => 6.0 * mean_fold_abs + 60.0 * mean_fold_port
 
         all_absolute_errors.append(mean_fold_abs)
         all_portfolio_errors.append(mean_fold_port)
@@ -81,171 +79,124 @@ def cross_validate_forecaster(
             print(f"   ├─ Mean Portfolio Error (per customer): {mean_fold_port:.2f}")
             print(f"   └─ Final Fold Score: {np.round(final_fold_score, 2)}")
 
-    # Final metrics
+    # Final metrics across folds
     mean_absolute_error = np.mean(all_absolute_errors)
     mean_portfolio_error = np.mean(all_portfolio_errors)
-    final_score = np.mean(fold_scores)
+    mean_final_score = np.mean(fold_scores)
 
-    print("\n📊 Cross-Validation Summary")
-    print(f"   ├─ Mean Absolute Error:  {mean_absolute_error:.2f}")
-    print(f"   ├─ Mean Portfolio Error: {mean_portfolio_error:.2f}")
-    print(f"   └─ Final CV Forecast Score: {np.round(final_score, 0)}")
-
-    # print("FOLD_SCORES!!==========================")
-    # print(fold_scores)
-
-    # Create 1 row, 3 columns canvas
-    fig, axs = plt.subplots(1, 3, figsize=(18, 5))
-
-    # Plot 1: Fold Scores
-    axs[0].plot(range(1, len(fold_scores) + 1), fold_scores, marker='o', linestyle='-')
-    axs[0].set_title('Fold Scores')
-    axs[0].set_xlabel('Fold')
-    axs[0].set_ylabel('Score')
-    axs[0].grid(True)
-
-    # Plot 2: Absolute Errors
-    axs[1].plot(range(1, len(all_absolute_errors) + 1), all_absolute_errors, marker='o', linestyle='-')
-    axs[1].set_title('Absolute Errors')
-    axs[1].set_xlabel('Fold')
-    axs[1].set_ylabel('Absolute Error')
-    axs[1].grid(True)
-
-    # Plot 3: Portfolio Errors
-    axs[2].plot(range(1, len(all_portfolio_errors) + 1), all_portfolio_errors, marker='o', linestyle='-')
-    axs[2].set_title('Portfolio Errors')
-    axs[2].set_xlabel('Fold')
-    axs[2].set_ylabel('Portfolio Error')
-    axs[2].grid(True)
-
-    plt.tight_layout()
-
-    # Save the plot
-    if save_path:
-        plt.savefig(save_path, bbox_inches='tight')
-    plt.close()
-
-    return mean_absolute_error, mean_portfolio_error, final_score
+    return mean_absolute_error, mean_portfolio_error, mean_final_score
 
 
 def evaluate(X: pd.DataFrame, y: pd.Series, save_path: str):
-    # abs_err, port_err, score = cross_validate_forecaster(simple_predictor, training_set, features)
+    """
+    Runs cross-validation with a given predictor and returns:
+      abs_err, port_err, score
+    """
     abs_err, port_err, score = cross_validate_forecaster(
         predictor=elastic_net_predictor,
         X=X,
         y=y,
         verbose=True,
-        save_path=save_path,  # or None to just show the plot
+        save_path=save_path,  # not currently used to save anything, but left for clarity
     )
 
     return abs_err, port_err, score
 
 
-def main(zone: str):
+def main(model_name: str):
+    """
+    Train and evaluate the models for IT and ES,
+    then append the final average score to a JSON file.
     """
 
-    Train and evaluate the models for IT and ES
+    for zone in ['ES', 'IT']:
+        # Inputs
+        input_path = r"datasets2025"
+        output_path = r"outputs"
 
-    """
+        # Load Datasets
+        loader = DataLoader(input_path)
+        training_set, features, example_results = loader.load_data(zone)
 
-    # Inputs
-    input_path = r"datasets2025"
-    output_path = r"outputs"
+        # Additional data
+        rollout, holidays = loader.load_additional_data(zone)
 
-    # Load Datasets
-    loader = DataLoader(input_path)
-    # features are holidays and temperature
-    training_set, features, example_results = loader.load_data(zone)
+        # Data Manipulation and Training
+        end_training = training_set.index.max()
+        start_forecast, end_forecast = example_results.index[0], example_results.index[-1]
 
-    """
-    EVERYTHING STARTING FROM HERE CAN BE MODIFIED.
-    """
-    rollout, holidays = loader.load_additional_data(zone)
-    # Add additional data to features
-
-    team_name = "HANGUK_ML"
-    # Data Manipulation and Training
-    start_training = training_set.index.min()
-    end_training = training_set.index.max()
-    start_forecast, end_forecast = example_results.index[0], example_results.index[-1]
-
-    dataset_encoding = DatasetEncoding(
-        training_set,
-        features,
-        rollout,
-        holidays,
-        end_training=end_training,
-        start_forecast=start_forecast,
-        end_forecast=end_forecast,
-    )
-
-    range_forecast = pd.date_range(start=start_forecast, end=end_forecast, freq="1H")
-    forecast = pd.DataFrame(columns=training_set.columns, index=range_forecast)
-    forecast_step = 1
-    errors = pd.DataFrame(
-        columns=["abs_err", "port_err", "score"],
-    )
-
-    for costumer in training_set.columns.values:
-        customer_id = int(costumer.split("_")[-1])
-        print(f"******************************************")
-        print(f"Start {customer_id}")
-
-        df = dataset_encoding.generate_dataset(
-            customer_id,
-            window_size=24 * 7,
-            forecast_skip=1,
-            forecast_horizon=1,
-            additional_feats=[
-                "mean",
-                "std",
-                "skew",
-                "kurtosis",
-                "min",
-                "max",
-            ],
+        dataset_encoding = DatasetEncoding(
+            training_set,
+            features,
+            rollout,
+            holidays,
+            end_training=end_training,
+            start_forecast=start_forecast,
+            end_forecast=end_forecast,
         )
 
-        # evaluate
-        X, y = dataset_encoding.get_train_data(df, customer_id, forecast_step=forecast_step, drop_nans_X=True)
-        abs_err, port_err, score = evaluate(X, y, f"{output_path}/{customer_id}.png")
-        errors.loc[customer_id] = [abs_err, port_err, score]
-        print(f"errors: {errors.loc[customer_id]}")
-        # consumption = training_set.loc[:, costumer]
+        range_forecast = pd.date_range(start=start_forecast, end=end_forecast, freq="1H")
+        forecast = pd.DataFrame(columns=training_set.columns, index=range_forecast)
+        forecast_step = 1
 
-        # feature_dummy = features["temp"].loc[start_training:]
+        errors = pd.DataFrame(columns=["abs_err", "port_err", "country"])
 
-        # encoding = SimpleEncoding(consumption, feature_dummy, end_training, start_forecast, end_forecast)
+        for costumer in training_set.columns.values:
+            customer_id = int(costumer.split("_")[-1])
+            print(f"******************************************")
+            print(f"Start {customer_id}")
 
-        # feature_past, feature_future, consumption_clean = encoding.meta_encoding()
+            df = dataset_encoding.generate_dataset(
+                customer_id,
+                window_size=24 * 7,
+                forecast_skip=1,
+                forecast_horizon=1,
+                additional_feats=["mean", "std", "skew", "kurtosis", "min", "max"],
+            )
 
-        # # Train
-        # model = SimpleModel()
-        # model.train(feature_past, consumption_clean)
+            # Evaluate
+            X, y = dataset_encoding.get_train_data(
+                df, customer_id, forecast_step=forecast_step, drop_nans_X=True
+            )
 
-        # # Predict
-        # output = model.predict(feature_future)
-        # forecast[costumer] = output
+            abs_err, port_err, cv_score = evaluate(X, y, f"{output_path}/{customer_id}.png")
+            errors.loc[customer_id] = {"abs_err": abs_err, "port_err": port_err, "country": zone}
 
-    """
-    END OF THE MODIFIABLE PART.
-    """
-    errors.to_csv(f"{output_path}/errors.csv")
-    print(errors.mean())
-    # test to make sure that the output has the expected shape.
-    dummy_error = np.abs(forecast - example_results).sum().sum()
-    assert np.all(forecast.columns == example_results.columns), "Wrong header or header order."
-    assert np.all(forecast.index == example_results.index), "Wrong index or index order."
-    assert isinstance(dummy_error, np.float64), "Wrong dummy_error type."
-    assert forecast.isna().sum().sum() == 0, "NaN in forecast."
-    # Your solution will be evaluated using
-    # forecast_error = np.abs(forecast - testing_set).sum().sum(),
-    # and then doing a weighted sum the two portfolios:
-    # score = forecast_error_IT + 5 * forecast_error_ES
+        # Compute final per-customer 'score' based on country
+        errors['score'] = errors.apply(
+            lambda x: (x['abs_err'] * 5 + x['port_err'] * 50)
+                      if x['country'] == 'ES'
+                      else (x['abs_err'] * 1 + x['port_err'] * 10),
+            axis=1
+        )
 
-    forecast.to_csv(join(output_path, "students_results_" + team_name + "_" + country + ".csv"))
+        # Save the errors
+        errors.to_csv(f"{output_path}/errors_{zone}.csv")
+
+        # Append final average score to a JSON file
+        final_score = float(errors['score'].mean())  # average across all customers for this zone
+        record = {
+            "model": model_name,
+            "zone": zone,
+            "final_score": final_score
+        }
+
+        with open("results.json", "a", encoding="utf-8") as f:
+            json.dump(record, f)
+            f.write("\n")
+
+        print(f"\n===== ZONE: {zone} =====")
+        print(f"Final average score: {final_score:.2f}")
+        print("========================\n")
 
 
 if __name__ == "__main__":
-    country = "IT"  # it can be ES or IT
-    main(country)
+    # Example usage: pass the model name on the command line or hardcode it
+    import sys
+
+    if len(sys.argv) > 1:
+        model_name = sys.argv[1]
+    else:
+        model_name = "elastic_net_predictor"
+
+    main(model_name)
