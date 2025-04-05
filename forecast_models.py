@@ -114,6 +114,55 @@ class TimeOLSmodel:
                                   axis = 1)
 
         return self.model.predict(features)
+    
+
+class TimeLGBMModel:
+    def __init__(self, prediction_window: int = 720):
+        self.prediction_window = prediction_window
+        self.model = LGBMRegressor(verbosity = 0)
+        self.encoder = OneHotEncoder(handle_unknown='ignore', sparse_output = False)
+
+    def _generate_time_features(self, index: pd.DatetimeIndex):
+        """
+        Generate one-hot encoded hour of day and day of week features from DatetimeIndex.
+        """
+        df = pd.DataFrame()
+        df["hour"] = index.hour
+        df["dayofweek"] = index.dayofweek
+        return self.encoder.transform(df)
+
+    def train(self, x: pd.DataFrame, y: np.ndarray):
+        """
+        x should have a datetime index and a 'consumption' column.
+        """
+        if not isinstance(x.index, pd.DatetimeIndex):
+            raise ValueError("Index must be a DatetimeIndex.")
+
+        df_time = pd.DataFrame()
+        df_time["hour"] = x.index.hour
+        df_time["dayofweek"] = x.index.dayofweek
+        self.encoder.fit(df_time)
+
+        time_features = self._generate_time_features(x.index)
+
+        # Combine time features with past consumption
+        features = np.concatenate([x["consumption"].values.reshape(-1, 1), time_features], 
+                                  axis = 1)
+
+        self.model.fit(features, y)
+
+    def predict(self, x: pd.DataFrame):
+        """
+        x should have a datetime index and a 'consumption' column.
+        """
+        if not isinstance(x.index, pd.DatetimeIndex):
+            raise ValueError("Index must be a DatetimeIndex.")
+
+        time_features = self._generate_time_features(x.index)
+        features = np.concatenate([x["consumption"].values.reshape(-1, 1), time_features], 
+                                  axis = 1)
+
+        return self.model.predict(features)
 
 
 
@@ -141,6 +190,15 @@ def lgbm_predictor(X_train, y_train, X_future):
 def ols_time_predictor(X_train, y_train, X_future):
 
     model = TimeOLSmodel()
+
+    model.train(X_train, y_train)
+
+    return model.predict(X_future)
+
+
+def lgbm_time_predictor(X_train, y_train, X_future):
+
+    model = TimeLGBMModel()
 
     model.train(X_train, y_train)
 

@@ -10,7 +10,6 @@ from sklearn.model_selection import TimeSeriesSplit
 
 # depending on your IDE, you might need to add datathon_eth. in front of data
 from data import DataLoader, DatasetEncoding, SimpleEncoding
-
 # depending on your IDE, you might need to add datathon_eth. in front of forecast_models
 from forecast_models import SimpleModel, elastic_net_predictor
 
@@ -133,7 +132,7 @@ def main(model_name: str, my_predictor, max_customers=10):
 
         # Data Manipulation and Training
         end_training = training_set.index.max()
-        start_training = training_set.index.max()
+        start_training = training_set.index.min()
 
         start_forecast, end_forecast = example_results.index[0], example_results.index[-1]
 
