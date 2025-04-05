@@ -28,7 +28,7 @@ def main(zone: str):
     """
     EVERYTHING STARTING FROM HERE CAN BE MODIFIED.
     """
-    team_name = "OurCoolTeamName"
+    team_name = "HANGUK_ML"
     # Data Manipulation and Training
     start_training = training_set.index.min()
     end_training = training_set.index.max()
