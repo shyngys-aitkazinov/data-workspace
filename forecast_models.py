@@ -1,3 +1,4 @@
+from lightgbm import LGBMRegressor
 from sklearn.linear_model import ElasticNet, LinearRegression
 
 
@@ -15,9 +16,6 @@ class SimpleModel:
 
     def predict(self, x):
         return self.linear_regression.predict(x)
-
-
-from lightgbm import LGBMRegressor
 
 
 class LightGBMModel:
@@ -57,13 +55,15 @@ class LightGBMModel:
         ----------
         x : array-like
             Feature matrix for prediction.
-        
+
         Returns:
         -------
         y_pred : array
             Predicted values.
         """
         return self.model.predict(x)
+
+
 # Initialize and run
 def elastic_net_predictor(X_train, y_train, X_future):
     """Train ElasticNet model on X_train and y_train, return predictions on X_future."""
@@ -72,5 +72,14 @@ def elastic_net_predictor(X_train, y_train, X_future):
 
     # Train the model
     model.fit(X_train, y_train)
+
+    return model.predict(X_future)
+
+
+def lgbm_predictor(X_train, y_train, X_future):
+
+    model = LightGBMModel()
+
+    model.train(X_train, y_train)
 
     return model.predict(X_future)
