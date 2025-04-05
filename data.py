@@ -374,3 +374,32 @@ class DatasetEncoding:
         # 6) Return the final DataFrame
         # ------------------------------------------------------
         return df
+
+    def get_train_data(
+        self,
+        df: pd.DataFrame,
+        customer_id: int,
+        forecast_step: int,
+        interpolate_limit: int = 1,
+        drop_nans_X: bool = False,
+    ) -> tuple[pd.DataFrame, pd.Series]:
+        target_column = f"{customer_id}_future_{forecast_step}"
+
+        # Perform linear interpolation on the "target" column
+        df[target_column] = df[target_column].interpolate(
+            method="time", limit=interpolate_limit, limit_direction="both", limit_area="inside"
+        )
+
+        if drop_nans_X:
+            futures = [col for col in df.columns if col.startswith(f"{customer_id}_future_") and col != target_column]
+            df = df.drop(columns=futures).dropna(axis=0)
+            y = df[target_column]
+            X = df.drop(columns=target_column)
+        else:
+            mask = df[target_column].notna()
+            y = df[target_column][mask]
+
+            to_drop = [col for col in df.columns if col.startswith(f"{customer_id}_future_")]
+            X = df[mask].drop(columns=to_drop)
+
+        return X, y

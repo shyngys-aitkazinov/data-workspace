@@ -49,8 +49,8 @@ def cross_validate_forecaster(
         y_train = y.loc[train_dates]
         y_test = y.loc[test_dates]
 
-        X_train = X[train_idx]
-        X_test = X[test_idx]
+        X_train = X.loc[train_dates]
+        X_test = X.loc[test_dates]
 
         if verbose:
             print("   ┌── Data shapes for first customer:")
@@ -117,15 +117,17 @@ def cross_validate_forecaster(
     return mean_absolute_error, mean_portfolio_error, final_score
 
 
-def evaluate(training_set, features):
+def evaluate(X: pd.DataFrame, y: pd.Series, save_path: str):
     # abs_err, port_err, score = cross_validate_forecaster(simple_predictor, training_set, features)
     abs_err, port_err, score = cross_validate_forecaster(
         predictor=elastic_net_predictor,
-        training_set=training_set,
-        features=features,
+        X=X,
+        y=y,
         verbose=True,
-        save_path=f"/Users/alexanders/datathon_2025/outputs/{country}_cv_histograms.png",  # or None to just show the plot
+        save_path=save_path,  # or None to just show the plot
     )
+
+    return abs_err, port_err, score
 
 
 def main(zone: str):
@@ -168,8 +170,15 @@ def main(zone: str):
 
     range_forecast = pd.date_range(start=start_forecast, end=end_forecast, freq="1H")
     forecast = pd.DataFrame(columns=training_set.columns, index=range_forecast)
+    forecast_step = 1
+    errors = pd.DataFrame(
+        columns=["abs_err", "port_err", "score"],
+    )
+
     for costumer in training_set.columns.values:
-        customer_id = int(costumer.split("_")[1])
+        customer_id = int(costumer.split("_")[-1])
+        print(f"******************************************")
+        print(f"Start {customer_id}")
 
         df = dataset_encoding.generate_dataset(
             customer_id,
@@ -186,26 +195,32 @@ def main(zone: str):
             ],
         )
 
-        consumption = training_set.loc[:, costumer]
+        # evaluate
+        X, y = dataset_encoding.get_train_data(df, customer_id, forecast_step=forecast_step, drop_nans_X=True)
+        abs_err, port_err, score = evaluate(X, y, f"{output_path}/{customer_id}.png")
+        errors.loc[customer_id] = [abs_err, port_err, score]
+        print(f"errors: {errors.loc[customer_id]}")
+        # consumption = training_set.loc[:, costumer]
 
-        feature_dummy = features["temp"].loc[start_training:]
+        # feature_dummy = features["temp"].loc[start_training:]
 
-        encoding = SimpleEncoding(consumption, feature_dummy, end_training, start_forecast, end_forecast)
+        # encoding = SimpleEncoding(consumption, feature_dummy, end_training, start_forecast, end_forecast)
 
-        feature_past, feature_future, consumption_clean = encoding.meta_encoding()
+        # feature_past, feature_future, consumption_clean = encoding.meta_encoding()
 
-        # Train
-        model = SimpleModel()
-        model.train(feature_past, consumption_clean)
+        # # Train
+        # model = SimpleModel()
+        # model.train(feature_past, consumption_clean)
 
-        # Predict
-        output = model.predict(feature_future)
-        forecast[costumer] = output
+        # # Predict
+        # output = model.predict(feature_future)
+        # forecast[costumer] = output
 
     """
     END OF THE MODIFIABLE PART.
     """
-
+    errors.to_csv(f"{output_path}/errors.csv")
+    print(errors.mean())
     # test to make sure that the output has the expected shape.
     dummy_error = np.abs(forecast - example_results).sum().sum()
     assert np.all(forecast.columns == example_results.columns), "Wrong header or header order."
