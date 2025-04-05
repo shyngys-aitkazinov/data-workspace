@@ -155,9 +155,8 @@ class DatasetEncoding:
         self.start_forecast = start_forecast
         self.end_forecast = end_forecast
 
-        self.customer_id_map = {i + 1: consumption.columns[i] for i in range(len(consumption.columns))}
-
-        self.rollout_id_map = {i + 1: rollout.columns[i] for i in range(len(rollout.columns))}
+        self.customer_id_map = {int(col.split("_")[-1]): col for col in consumption.columns}
+        self.rollout_id_map = {int(col.split("_")[-1]): col for col in rollout.columns}
 
     def generate_time_series_features(self, start_time: pd.Timestamp, end_time: pd.Timestamp) -> pd.DataFrame:
         """
