@@ -202,7 +202,7 @@ class AutoRegressor:
             X, _ = self.dataset_encoding.get_test_sample(self.df, ts_before, customer_id, forecast_step=FORECAST_STEP)
             y_pred = self.model.predict(X)[0]
 
-            if ts.year == 2024 and ts.month == 8:
+            if ts.year == 2024 and ts.month == 8 and ts.day == 15:
                 # Find the same day in August 2023
                 ts_2023 = ts.replace(year=2023)
                 day_start_2023 = ts_2023.normalize()
@@ -218,10 +218,10 @@ class AutoRegressor:
                 sum_today = self.df.loc[mask_current, "consumption"].sum()
                 sum_prev = self.df.loc[mask_prev, "consumption"].sum()
 
-                if not sum_prev.is_null().any():
+                if not pd.isnull(sum_prev):
                     # If current day consumption in 2023 is less than 50% of previous day's, clip prediction
                     if sum_prev > 0 and sum_today < 0.5 * sum_prev:
-                        y_pred = min(y_pred, 0.1)
+                        y_pred = min(y_pred, sum_today / 24)
 
             self.df.loc[ts, "consumption"] = y_pred
             # Update the feature vector with the new prediction.
@@ -292,12 +292,12 @@ def main(zone: str):
     end_training = training_set.index.max()
     start_forecast, end_forecast = example_results.index[0], example_results.index[-1]
 
-    data_format = "%Y-%m-%d %H:%M:%S"
-    start_training = training_set.index.min()
+    # data_format = "%Y-%m-%d %H:%M:%S"
+    # start_training = training_set.index.min()
 
-    end_training = pd.to_datetime("2023-07-31 23:00:00", format=data_format)
-    start_forecast = pd.to_datetime("2023-08-01 00:00:00", format=data_format)
-    end_forecast = pd.to_datetime("2023-08-31 23:00:00", format=data_format)
+    # end_training = pd.to_datetime("2023-07-31 23:00:00", format=data_format)
+    # start_forecast = pd.to_datetime("2023-08-01 00:00:00", format=data_format)
+    # end_forecast = pd.to_datetime("2023-08-31 23:00:00", format=data_format)
 
     dataset_encoding = DatasetEncoding(
         training_set,
@@ -331,13 +331,13 @@ def main(zone: str):
     range_forecast = pd.date_range(start=start_forecast, end=end_forecast, freq="1h")
     forecast = pd.DataFrame(columns=training_set.columns, index=range_forecast)
 
-    for costumer in training_set.columns.values[2:3]:
+    for costumer in training_set.columns.values:
         ar = AutoRegressor(
             dataset_encoding=dataset_encoding,
             model=LightGBMModel(
                 objective="huber",
                 n_estimators=300,
-                learning_rate=0.1,
+                learning_rate=0.15,
             ),  # or "binary", "multiclass", etc),
             # model=ELasticNetModel(),
             model_path=None,
@@ -352,15 +352,14 @@ def main(zone: str):
         # Make sure to set negative values to 0.001
         forecast[costumer][forecast[costumer] < 0.0] = 0.001
 
-        plot(
-            training_set.loc[range_forecast, costumer],
-            forecast[costumer],
-            save_path=join(output_path, f"{team_name}_{zone}_{customer_id}.png"),
-        )
+        # plot(
+        #     training_set.loc[range_forecast, costumer],
+        #     forecast[costumer],
+        #     save_path=join(output_path, f"{team_name}_{zone}_{customer_id}.png"),
+        # )
         # print(evaluate_forecast(training_set.loc[range_forecast, costumer], forecast[costumer]))
         # break
         forecast[costumer].to_csv(f"{output_path}/{zone}_{customer_id}.csv")
-        break
 
     """
     END OF THE MODIFIABLE PART.
