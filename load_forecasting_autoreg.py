@@ -203,8 +203,28 @@ class AutoRegressor:
             X, _ = self.dataset_encoding.get_test_sample(self.df, ts_before, customer_id, forecast_step=FORECAST_STEP)
             y_pred = self.model.predict(X)[0]
 
-            if ts.dayofweek in [5, 6]:
-                y_pred = 1e-3
+            if ts.year == 2024 and ts.month == 8:
+                # Find the same day in August 2023
+                ts_2023 = ts.replace(year=2023)
+                day_start_2023 = ts_2023.normalize()
+                day_end_2023 = day_start_2023 + pd.Timedelta(days=1)
+
+                prev_day_start_2023 = day_start_2023 - pd.Timedelta(days=1)
+                prev_day_end_2023 = day_start_2023
+
+                # Calculate sum of consumption over current and previous day in 2023
+                mask_current = (self.df.index >= day_start_2023) & (self.df.index < day_end_2023)
+                mask_prev = (self.df.index >= prev_day_start_2023) & (self.df.index < prev_day_end_2023)
+
+                sum_today = self.df.loc[mask_current, "consumption"].sum()
+                sum_prev = self.df.loc[mask_prev, "consumption"].sum()
+
+                if not sum_prev.is_null().any():
+
+                    # If current day consumption in 2023 is less than 50% of previous day's, clip prediction
+                    if sum_prev > 0 and sum_today < 0.5 * sum_prev:
+                        y_pred = min(y_pred, 0.1)
+
 
             self.df.loc[ts, "consumption"] = y_pred
             # Update the feature vector with the new prediction.
