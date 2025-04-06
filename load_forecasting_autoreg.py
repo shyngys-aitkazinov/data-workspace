@@ -11,9 +11,9 @@ from xgboost import XGBRegressor
 
 # depending on your IDE, you might need to add datathon_eth. in front of data
 from data import DataLoader, DatasetEncoding, SimpleEncoding
-
 # depending on your IDE, you might need to add datathon_eth. in front of forecast_models
-from forecast_models import ELasticNetModel, LightGBMModel, SimpleModel, elastic_net_predictor
+from forecast_models import (ELasticNetModel, LightGBMModel, SimpleModel,
+                             elastic_net_predictor)
 
 FORECAST_STEP = 1
 
@@ -144,6 +144,9 @@ class AutoRegressor:
             ts_before = ts - pd.Timedelta(hours=1)
             X, _ = self.dataset_encoding.get_test_sample(self.df, ts_before, customer_id, forecast_step=FORECAST_STEP)
             y_pred = self.model.predict(X)[0]
+
+            if ts.dayofweek in [5, 6]:
+                y_pred = 1e-3
 
             self.df.loc[ts, "consumption"] = y_pred
             # Update the feature vector with the new prediction.
@@ -295,10 +298,10 @@ def main(zone: str):
     """
     # test to make sure that the output has the expected shape.
     # dummy_error = np.abs(forecast - example_results).sum().sum()
-    # assert np.all(forecast.columns == example_results.columns), "Wrong header or header order."
-    # assert np.all(forecast.index == example_results.index), "Wrong index or index order."
+    assert np.all(forecast.columns == example_results.columns), "Wrong header or header order."
+    assert np.all(forecast.index == example_results.index), "Wrong index or index order."
     # assert isinstance(dummy_error, np.float64), "Wrong dummy_error type."
-    # assert forecast.isna().sum().sum() == 0, "NaN in forecast."
+    assert forecast.isna().sum().sum() == 0, "NaN in forecast."
     # Your solution will be evaluated using
     # forecast_error = np.abs(forecast - testing_set).sum().sum(),
     # and then doing a weighted sum the two portfolios:
