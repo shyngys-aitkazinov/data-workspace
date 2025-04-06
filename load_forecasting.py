@@ -10,6 +10,7 @@ from sklearn.model_selection import TimeSeriesSplit
 
 # depending on your IDE, you might need to add datathon_eth. in front of data
 from data import DataLoader, DatasetEncoding, SimpleEncoding
+
 # depending on your IDE, you might need to add datathon_eth. in front of forecast_models
 from forecast_models import SimpleModel, elastic_net_predictor
 

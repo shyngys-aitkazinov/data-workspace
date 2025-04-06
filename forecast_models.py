@@ -17,6 +17,9 @@ class SimpleModel:
     def train(self, x, y):
         self.linear_regression.fit(x, y)
 
+    def fit(self, x, y):
+        self.linear_regression.fit(x, y)
+
     def predict(self, x):
         return self.linear_regression.predict(x)
 
@@ -78,6 +81,17 @@ class LightGBMModel:
             Predicted values.
         """
         return self.model.predict(x)
+
+    def feature_importances(self, X: pd.DataFrame):
+        """
+        Print feature importances of the trained model.
+
+        Parameters:
+        ----------
+        X : pd.DataFrame
+            Feature matrix used for training.
+        """
+        print(sorted(list(zip(self.model.feature_importances_, X.columns)), reverse=True))
 
 
 class TimeOLSmodel:
@@ -195,6 +209,9 @@ class ELasticNetModel:
 
     def predict(self, X):
         return self.model.predict(X)
+
+    def feature_importances(self, X: pd.DataFrame):
+        print(sorted(list(zip(self.model.coef_, X.columns)), reverse=True))
 
 
 def lgbm_predictor(X_train, y_train, X_future):

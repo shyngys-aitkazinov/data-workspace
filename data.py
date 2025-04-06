@@ -366,6 +366,10 @@ class DatasetEncoding:
                 add_dict["rolling_max"] = (
                     df["consumption"].rolling(window=window_size, min_periods=window_size // 2).max()
                 )
+            elif add_feat == "month_ago":
+                add_dict["month_ago"] = df["consumption"].shift(freq=pd.DateOffset(months=1))
+            elif add_feat == "week_ago":
+                add_dict["week_ago"] = df["consumption"].shift(freq=pd.DateOffset(weeks=1))
             else:
                 if add_feat not in df.columns:
                     print(f"Warning: '{add_feat}' not recognized as a stat or existing column.")
@@ -417,6 +421,6 @@ class DatasetEncoding:
     ) -> tuple[pd.DataFrame, pd.Series]:
         target_column = f"{customer_id}_future_{forecast_step}"
         to_drop = [col for col in df.columns if col.startswith(f"{customer_id}_future_")]
-        X = df.drop(columns=to_drop).loc[ts : ts + pd.Timedelta(hours=1)]
-        y = df[target_column].loc[ts : ts + pd.Timedelta(hours=1)]
+        X = df.drop(columns=to_drop).loc[[ts]]
+        y = df[target_column].loc[ts]
         return X, y
