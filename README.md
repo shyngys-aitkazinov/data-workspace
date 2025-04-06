@@ -60,6 +60,10 @@ Stores evaluations for model and hyperparameter selection.
 `environmentAlpiqDatathon.yml`
 Conda environment definition used during the Alpiq Datathonpy.
 
+## Presentation
+
+Feel free to learn more about our approach and the highlights of our model in the attached `presentation.pdf` file
+
 ## Important note!
 
 Please use 'HANGUK_ML' for scoring; this is the name we use in our output files
