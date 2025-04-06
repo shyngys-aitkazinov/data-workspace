@@ -1,13 +1,4 @@
-{"model": "elastic_net_predictor", "zone": "ES", "final_score": 9104.022669975717}
-{"model": "elastic_net_predictor", "zone": "IT", "final_score": 468.6041586258895}
-{"model": "elastic_net_predictor", "zone": "ES", "final_score": 9104.022669975717}
-{"model": "elastic_net_predictor", "zone": "IT", "final_score": 468.6041586258895}
-{"model": "elastic_net_predictor", "zone": "ES", "final_score": 9104.022669975717}
-{"model": "elastic_net_predictor", "zone": "IT", "final_score": 468.6041586258895}
-{"model": "elastic_net_predictor", "final_score": 8655.120002377957, "std_abs_err": 568.4445228161128}
 {"model": "elastic_net_predictor", "final_score": 8655.120002377957, "std_abs_err": 40.39759315760613}
-{"model": "lgbm_predictor_dont_remove_x_nans", "final_score": 1276.8969533241461, "std_abs_err": 9.762506960128745}
 {"model": "lgbm_predictor_depth_3_lr_005_iter_100_customers_100", "final_score": 1332.5446646434266, "std_abs_err": 10.142847447494558}
 {"model": "ols_time_predictor", "final_score": 1067.4501519718776, "std_abs_err": 10.504065180861657}
-{"model": "lgbm_time_predictor", "final_score": 1350.630877824459, "std_abs_err": 10.019508329510264}
 {"model": "lgbm_time_predictor", "final_score": 1350.630877824459, "std_abs_err": 10.019508329510264}

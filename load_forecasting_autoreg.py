@@ -7,13 +7,16 @@ import numpy as np
 import pandas as pd
 from scipy.stats import kurtosis
 from sklearn.model_selection import TimeSeriesSplit
-from xgboost import XGBRegressor
 
 # depending on your IDE, you might need to add datathon_eth. in front of data
 from data import DataLoader, DatasetEncoding, SimpleEncoding
-
 # depending on your IDE, you might need to add datathon_eth. in front of forecast_models
-from forecast_models import ELasticNetModel, LightGBMModel, SimpleModel, elastic_net_predictor
+from forecast_models import (ELasticNetModel, LightGBMModel, SimpleModel,
+                             elastic_net_predictor)
+
+# from xgboost import XGBRegressor
+
+
 
 FORECAST_STEP = 1
 
@@ -357,8 +360,6 @@ def main(zone: str):
         #     forecast[costumer],
         #     save_path=join(output_path, f"{team_name}_{zone}_{customer_id}.png"),
         # )
-        # print(evaluate_forecast(training_set.loc[range_forecast, costumer], forecast[costumer]))
-        # break
         forecast[costumer].to_csv(f"{output_path}/{zone}_{customer_id}.csv")
 
     """
