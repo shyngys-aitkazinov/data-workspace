@@ -11,9 +11,9 @@ from xgboost import XGBRegressor
 
 # depending on your IDE, you might need to add datathon_eth. in front of data
 from data import DataLoader, DatasetEncoding, SimpleEncoding
+
 # depending on your IDE, you might need to add datathon_eth. in front of forecast_models
-from forecast_models import (ELasticNetModel, LightGBMModel, SimpleModel,
-                             elastic_net_predictor)
+from forecast_models import ELasticNetModel, LightGBMModel, SimpleModel, elastic_net_predictor
 
 FORECAST_STEP = 1
 
@@ -61,7 +61,6 @@ class AutoRegressor:
             drop_nans_X=False,
         )
         self.model.fit(X, y)
-        self.model.feature_importances(X)
 
     def predict(self, customer_id: int) -> pd.Series:
         if self._requires_train:
@@ -220,11 +219,9 @@ class AutoRegressor:
                 sum_prev = self.df.loc[mask_prev, "consumption"].sum()
 
                 if not sum_prev.is_null().any():
-
                     # If current day consumption in 2023 is less than 50% of previous day's, clip prediction
                     if sum_prev > 0 and sum_today < 0.5 * sum_prev:
                         y_pred = min(y_pred, 0.1)
-
 
             self.df.loc[ts, "consumption"] = y_pred
             # Update the feature vector with the new prediction.
@@ -237,7 +234,7 @@ def plot(gt: pd.Series, pred: pd.Series, save_path: str | None = None):
     # Create a wide figure (e.g., 30 inches wide by 10 inches tall)
     plt.figure(figsize=(30, 10), dpi=100)
 
-    index = gt.index
+    index = pred.index
 
     # Plot the two series with different colors and labels
     plt.plot(index, gt, label="Ground Truth", color="blue", linewidth=2)
@@ -291,16 +288,16 @@ def main(zone: str):
     # models_path = r"models_path"
     models_path = None
     # Data Manipulation and Training
-    # start_training = training_set.index.min()
-    # end_training = training_set.index.max()
-    # start_forecast, end_forecast = example_results.index[0], example_results.index[-1]
+    start_training = training_set.index.min()
+    end_training = training_set.index.max()
+    start_forecast, end_forecast = example_results.index[0], example_results.index[-1]
 
     data_format = "%Y-%m-%d %H:%M:%S"
     start_training = training_set.index.min()
 
-    end_training = pd.to_datetime("2024-06-30 23:00:00", format=data_format)
-    start_forecast = pd.to_datetime("2024-06-30 23:00:00", format=data_format)
-    end_forecast = pd.to_datetime("2024-07-31 23:00:00", format=data_format)
+    end_training = pd.to_datetime("2023-07-31 23:00:00", format=data_format)
+    start_forecast = pd.to_datetime("2023-08-01 00:00:00", format=data_format)
+    end_forecast = pd.to_datetime("2023-08-31 23:00:00", format=data_format)
 
     dataset_encoding = DatasetEncoding(
         training_set,
@@ -334,19 +331,18 @@ def main(zone: str):
     range_forecast = pd.date_range(start=start_forecast, end=end_forecast, freq="1h")
     forecast = pd.DataFrame(columns=training_set.columns, index=range_forecast)
 
-    ar = AutoRegressor(
-        dataset_encoding=dataset_encoding,
-        model=LightGBMModel(
-            objective="huber",
-            n_estimators=300,
-            learning_rate=0.2,
-        ),  # or "binary", "multiclass", etc),
-        # model=ELasticNetModel(),
-        model_path=None,
-        **kwargs,
-    )
-
-    for costumer in training_set.columns.values:
+    for costumer in training_set.columns.values[2:3]:
+        ar = AutoRegressor(
+            dataset_encoding=dataset_encoding,
+            model=LightGBMModel(
+                objective="huber",
+                n_estimators=300,
+                learning_rate=0.1,
+            ),  # or "binary", "multiclass", etc),
+            # model=ELasticNetModel(),
+            model_path=None,
+            **kwargs,
+        )
         customer_id = int(costumer.split("_")[-1])
         print(f"******************************************")
         print(f"Start {customer_id}")
@@ -355,22 +351,25 @@ def main(zone: str):
 
         # Make sure to set negative values to 0.001
         forecast[costumer][forecast[costumer] < 0.0] = 0.001
+
         plot(
             training_set.loc[range_forecast, costumer],
             forecast[costumer],
             save_path=join(output_path, f"{team_name}_{zone}_{customer_id}.png"),
         )
-        print(evaluate_forecast(training_set.loc[range_forecast, costumer], forecast[costumer]))
+        # print(evaluate_forecast(training_set.loc[range_forecast, costumer], forecast[costumer]))
+        # break
+        forecast[costumer].to_csv(f"{output_path}/{zone}_{customer_id}.csv")
         break
 
     """
     END OF THE MODIFIABLE PART.
     """
     # test to make sure that the output has the expected shape.
-    # dummy_error = np.abs(forecast - example_results).sum().sum()
+    dummy_error = np.abs(forecast - example_results).sum().sum()
     assert np.all(forecast.columns == example_results.columns), "Wrong header or header order."
     assert np.all(forecast.index == example_results.index), "Wrong index or index order."
-    # assert isinstance(dummy_error, np.float64), "Wrong dummy_error type."
+    assert isinstance(dummy_error, np.float64), "Wrong dummy_error type."
     assert forecast.isna().sum().sum() == 0, "NaN in forecast."
     # Your solution will be evaluated using
     # forecast_error = np.abs(forecast - testing_set).sum().sum(),
