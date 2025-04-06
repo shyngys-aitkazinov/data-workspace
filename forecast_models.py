@@ -50,6 +50,19 @@ class LightGBMModel:
         """
         self.model.fit(x, y)
 
+    def fit(self, x, y):
+        """
+        Fit the model on training data.
+
+        Parameters:
+        ----------
+        x : array-like
+            Feature matrix.
+        y : array-like
+            Target values.
+        """
+        self.model.fit(x, y)
+
     def predict(self, x):
         """
         Make predictions using the trained model.
@@ -65,13 +78,13 @@ class LightGBMModel:
             Predicted values.
         """
         return self.model.predict(x)
-    
+
 
 class TimeOLSmodel:
     def __init__(self, prediction_window: int = 720):
         self.prediction_window = prediction_window
         self.model = LinearRegression()
-        self.encoder = OneHotEncoder(handle_unknown='ignore', sparse_output = False)
+        self.encoder = OneHotEncoder(handle_unknown="ignore", sparse_output=False)
 
     def _generate_time_features(self, index: pd.DatetimeIndex):
         """
@@ -97,8 +110,7 @@ class TimeOLSmodel:
         time_features = self._generate_time_features(x.index)
 
         # Combine time features with past consumption
-        features = np.concatenate([x["consumption"].values.reshape(-1, 1), time_features], 
-                                  axis = 1)
+        features = np.concatenate([x["consumption"].values.reshape(-1, 1), time_features], axis=1)
 
         self.model.fit(features, y)
 
@@ -110,17 +122,16 @@ class TimeOLSmodel:
             raise ValueError("Index must be a DatetimeIndex.")
 
         time_features = self._generate_time_features(x.index)
-        features = np.concatenate([x["consumption"].values.reshape(-1, 1), time_features], 
-                                  axis = 1)
+        features = np.concatenate([x["consumption"].values.reshape(-1, 1), time_features], axis=1)
 
         return self.model.predict(features)
-    
+
 
 class TimeLGBMModel:
     def __init__(self, prediction_window: int = 720):
         self.prediction_window = prediction_window
-        self.model = LGBMRegressor(verbosity = 0)
-        self.encoder = OneHotEncoder(handle_unknown='ignore', sparse_output = False)
+        self.model = LGBMRegressor(verbosity=0)
+        self.encoder = OneHotEncoder(handle_unknown="ignore", sparse_output=False)
 
     def _generate_time_features(self, index: pd.DatetimeIndex):
         """
@@ -146,8 +157,7 @@ class TimeLGBMModel:
         time_features = self._generate_time_features(x.index)
 
         # Combine time features with past consumption
-        features = np.concatenate([x["consumption"].values.reshape(-1, 1), time_features], 
-                                  axis = 1)
+        features = np.concatenate([x["consumption"].values.reshape(-1, 1), time_features], axis=1)
 
         self.model.fit(features, y)
 
@@ -159,11 +169,9 @@ class TimeLGBMModel:
             raise ValueError("Index must be a DatetimeIndex.")
 
         time_features = self._generate_time_features(x.index)
-        features = np.concatenate([x["consumption"].values.reshape(-1, 1), time_features], 
-                                  axis = 1)
+        features = np.concatenate([x["consumption"].values.reshape(-1, 1), time_features], axis=1)
 
         return self.model.predict(features)
-
 
 
 # Initialize and run
@@ -178,8 +186,18 @@ def elastic_net_predictor(X_train, y_train, X_future):
     return model.predict(X_future)
 
 
-def lgbm_predictor(X_train, y_train, X_future):
+class ELasticNetModel:
+    def __init__(self, **params):
+        self.model = ElasticNet(**params)
 
+    def fit(self, X, y):
+        self.model.fit(X, y)
+
+    def predict(self, X):
+        return self.model.predict(X)
+
+
+def lgbm_predictor(X_train, y_train, X_future):
     model = LightGBMModel()
 
     model.train(X_train, y_train)
@@ -188,7 +206,6 @@ def lgbm_predictor(X_train, y_train, X_future):
 
 
 def ols_time_predictor(X_train, y_train, X_future):
-
     model = TimeOLSmodel()
 
     model.train(X_train, y_train)
@@ -197,7 +214,6 @@ def ols_time_predictor(X_train, y_train, X_future):
 
 
 def lgbm_time_predictor(X_train, y_train, X_future):
-
     model = TimeLGBMModel()
 
     model.train(X_train, y_train)

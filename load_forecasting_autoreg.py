@@ -5,31 +5,165 @@ from typing import Optional
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from scipy.stats import kurtosis
 from sklearn.model_selection import TimeSeriesSplit
 
 # depending on your IDE, you might need to add datathon_eth. in front of data
 from data import DataLoader, DatasetEncoding, SimpleEncoding
 # depending on your IDE, you might need to add datathon_eth. in front of forecast_models
-from forecast_models import SimpleModel, elastic_net_predictor
+from forecast_models import ELasticNetModel, LightGBMModel, SimpleModel, elastic_net_predictor
+
+FORECAST_STEP = 1
 
 
 class AutoRegressor:
     def __init__(
         self,
-        model,
         dataset_encoding: DatasetEncoding,
+        model,
+        model_path: str | None = None,
+        **kwargs,
     ):
         self.model = model
+        self._requires_train = True
+        if model_path is not None:
+            self.model = np.load(model_path)
+            self._requires_train = False
         self.end_training = dataset_encoding.end_training
         self.start_forecast = dataset_encoding.start_forecast
         self.end_forecast = dataset_encoding.end_forecast
         self.start_training = dataset_encoding.start_training
 
-    def train(self, X, y):
+        self.dataset_encoding = dataset_encoding
+        self.kwargs = kwargs
+        self.window_size = kwargs.get("window_size", 24 * 7)
+        self.additional_feats = kwargs.get("additional_feats", [])
+
+    def setup_df(self, customer_id: int):
+        """
+        Generate the dataset for the given customer ID.
+        This method is called during initialization and when updating features.
+        """
+        self.df = self.dataset_encoding.generate_dataset(
+            customer_id,
+            start_time=self.start_training,
+            end_time=self.end_training,
+            **self.kwargs,
+        )
+
+    def train(self, customer_id: int, forecast_step=FORECAST_STEP):
+        X, y = self.dataset_encoding.get_train_data(
+            self.df.loc[self.start_training : self.end_training],
+            customer_id,
+            forecast_step,
+        )
         self.model.fit(X, y)
 
-    def predict(self, X):
-        return self.model.predict(X)
+    def predict(self, customer_id: int) -> pd.Series:
+        if self._requires_train:
+            self.train(customer_id)
+        return self.predict_autoregressive(customer_id)
+
+    def update_features(
+        self,
+        ts: pd.Timestamp,
+        customer_id: int,
+    ) -> pd.DataFrame:
+        """
+        Update the lag features of the current feature vector.
+        Assumes that lag features are named as f"{customer_id}_lag_{i}" for i=1,...,window_size.
+
+        The update shifts existing lag values one step back and inserts y_pred as the new lag_1.
+        """
+
+        timeseries = self.df.loc[
+            ts - pd.Timedelta(hours=self.window_size - 1) : ts + pd.Timedelta(hours=1), "consumption"
+        ]
+
+        # For lag_i (i from 2 to window_size), set new lag value equal to the old lag_{i-1} from time ts.
+        for lag in range(1, self.window_size + 1):
+            self.df.loc[ts, f"{customer_id}_lag_{lag}"] = self.df.loc[
+                ts - pd.Timedelta(hours=lag), f"{customer_id}_lag_{lag}"
+            ]
+
+        for add_feat in self.additional_feats:
+            if add_feat == "mean":
+                # Require full window for a valid mean, else NaN.
+                self.df.loc[ts, "rolling_mean"] = np.mean(timeseries)
+            elif add_feat == "std":
+                # Require full window for a valid std, else NaN.
+                self.df.loc[ts, "rolling_std"] = np.std(timeseries)
+            elif add_feat == "kurtosis":
+                self.df.loc[ts, "rolling_kurtosis"] = timeseries.kurt()
+            elif add_feat == "skew":
+                # Require full window for a valid skew, else NaN.
+                self.df.loc[ts, "rolling_skew"] = timeseries.skew()
+            elif add_feat == "min":
+                # Require full window for a valid min, else NaN.
+                self.df.loc[ts, "rolling_min"] = np.min(timeseries)
+            elif add_feat == "max":
+                self.df.loc[ts, "rolling_max"] = np.max(timeseries)
+            else:
+                if add_feat not in self.df.columns:
+                    print(f"Warning: '{add_feat}' not recognized as a stat or existing column.")
+
+    def predict_autoregressive(self, customer_id: int) -> pd.Series:
+        """
+        Perform autoregressive forecasting over forecast_horizon steps.
+
+        1. Generate an initial feature vector (using dataset_encoding) at the forecast start.
+        2. Iteratively predict one time step ahead.
+        3. Update the lag features in the feature vector with the new prediction.
+
+        Args:
+            customer_id (int): The customer ID to forecast.
+            forecast_horizon (int): How many time steps to forecast.
+            window_size (int): The number of lag features used by the model.
+            kwargs: Additional parameters for generating the dataset.
+
+        Returns:
+            list: A list of forecasted values.
+        """
+        # Generate initial forecast features.
+        # Here we assume generate_dataset returns a DataFrame covering the forecast period.
+
+        for ts in pd.date_range(self.start_forecast, self.end_forecast, freq="1H"):
+            # Predict one time step ahead.
+            # Suppose ts is a pd.Timestamp
+            ts_before = ts - pd.Timedelta(hours=1)
+            X, _ = self.dataset_encoding.get_test_sample(self.df, ts_before, customer_id, forecast_step=FORECAST_STEP)
+            y_pred = self.model.predict(X)[0]
+
+            self.df.loc[ts, "consumption"] = y_pred
+            # Update the feature vector with the new prediction.
+            self.update_features(ts, customer_id)
+
+        return self.df.loc[self.start_forecast : self.end_forecast, "consumption"]
+
+
+def plot(gt: pd.Series, pred: pd.Series, save_path: str | None = None):
+    # Create a wide figure (e.g., 30 inches wide by 10 inches tall)
+    plt.figure(figsize=(30, 10), dpi=100)
+
+    index = gt.index
+
+    # Plot the two series with different colors and labels
+    plt.plot(index, gt, label="Ground Truth", color="blue", linewidth=2)
+    plt.plot(index, pred, label="Prediction", color="red", linewidth=2)
+
+    # Add title and labels
+    plt.title("Time Series Plot of Two Lines (720 Data Points)")
+    plt.xlabel("Time")
+    plt.ylabel("Value")
+
+    # Enable grid and legend
+    plt.grid(True)
+    plt.legend()
+
+    # Improve layout and export to PNG with high resolution
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=300)
+    plt.show()
 
 
 def evaluate_forecast(y_true, y_pred):
@@ -39,90 +173,23 @@ def evaluate_forecast(y_true, y_pred):
     return country_error, abs(portfolio_country_error)
 
 
-def cross_validate_forecaster(
-    predictor: Callable,
-    X: pd.DataFrame,
-    y: pd.Series,
-    verbose=True,
-    save_path=None,
-    n_splits=5,
-):
-    """
-    Perform time-series cross-validation.
-    Returns:
-      mean_abs_err, mean_port_err, mean_final_score,
-      std_abs_err,  std_port_err,  std_final_score
-    """
-    tscv = TimeSeriesSplit(n_splits=n_splits)
-    all_absolute_errors = []
-    all_portfolio_errors = []
-    fold_scores = []
+# def evaluate(X: pd.DataFrame, y: pd.Series, save_path: str, my_predictor):
+#     """
+#     Runs cross-validation with a given predictor.
+#     Returns:
+#       abs_err, port_err, score, abs_err_std, port_err_std, score_std
+#     """
+#     results = cross_validate_forecaster(
+#         predictor=my_predictor,
+#         X=X,
+#         y=y,
+#         verbose=True,
+#         save_path=save_path,  # not currently used to save anything, but left for clarity
+#     )
 
-    for fold, (train_idx, test_idx) in enumerate(tscv.split(y.index), start=1):
-        train_dates = pd.to_datetime(y.index[train_idx])
-        test_dates = pd.to_datetime(y.index[test_idx])
+#     (abs_err, port_err, score, abs_err_std, port_err_std, score_std) = results
 
-        if len(test_dates) == 0:
-            continue
-
-        y_train = y.loc[train_dates]
-        y_test = y.loc[test_dates]
-
-        X_train = X.loc[train_dates]
-        X_test = X.loc[test_dates]
-
-        y_hat = predictor(X_train, y_train, X_test)
-
-        country_err, portfolio_err = evaluate_forecast(y_test, y_hat)
-
-        # Sum of absolute errors for that fold
-        mean_fold_abs = country_err
-        mean_fold_port = portfolio_err
-
-        # Example scoring formula (your logic may differ):
-        final_fold_score = 1.0 * mean_fold_abs + 5.0 * mean_fold_abs + 10.0 * mean_fold_port + 50.0 * mean_fold_port
-        # => 6.0 * mean_fold_abs + 60.0 * mean_fold_port
-
-        all_absolute_errors.append(mean_fold_abs)
-        all_portfolio_errors.append(mean_fold_port)
-        fold_scores.append(final_fold_score)
-
-    # Final metrics across folds
-    mean_abs_err = np.mean(all_absolute_errors)
-    mean_port_err = np.mean(all_portfolio_errors)
-    mean_final_score = np.mean(fold_scores)
-
-    std_abs_err = np.std(all_absolute_errors)
-    std_port_err = np.std(all_portfolio_errors)
-    std_final_score = np.std(fold_scores)
-
-    return (
-        mean_abs_err,
-        mean_port_err,
-        mean_final_score,
-        std_abs_err,
-        std_port_err,
-        std_final_score,
-    )
-
-
-def evaluate(X: pd.DataFrame, y: pd.Series, save_path: str, my_predictor):
-    """
-    Runs cross-validation with a given predictor.
-    Returns:
-      abs_err, port_err, score, abs_err_std, port_err_std, score_std
-    """
-    results = cross_validate_forecaster(
-        predictor=my_predictor,
-        X=X,
-        y=y,
-        verbose=True,
-        save_path=save_path,  # not currently used to save anything, but left for clarity
-    )
-
-    (abs_err, port_err, score, abs_err_std, port_err_std, score_std) = results
-
-    return abs_err, port_err, score, abs_err_std, port_err_std, score_std
+#     return abs_err, port_err, score, abs_err_std, port_err_std, score_std
 
 
 def main(zone: str):
@@ -135,6 +202,8 @@ def main(zone: str):
     # Inputs
     input_path = r"datasets2025"
     output_path = r"outputs"
+    # models_path = r"models_path"
+    models_path = None
 
     # Load Datasets
     loader = DataLoader(input_path)
@@ -149,9 +218,16 @@ def main(zone: str):
 
     team_name = "HANGUK_ML"
     # Data Manipulation and Training
+    # start_training = training_set.index.min()
+    # end_training = training_set.index.max()
+    # start_forecast, end_forecast = example_results.index[0], example_results.index[-1]
+
+    data_format = "%Y-%m-%d %H:%M:%S"
     start_training = training_set.index.min()
-    end_training = training_set.index.max()
-    start_forecast, end_forecast = example_results.index[0], example_results.index[-1]
+
+    end_training = pd.to_datetime("2024-06-30 23:00:00", format=data_format)
+    start_forecast = pd.to_datetime("2024-06-30 23:00:00", format=data_format)
+    end_forecast = pd.to_datetime("2024-07-31 23:00:00", format=data_format)
 
     dataset_encoding = DatasetEncoding(
         training_set,
@@ -164,59 +240,45 @@ def main(zone: str):
         end_forecast=end_forecast,
     )
 
-    range_forecast = pd.date_range(start=start_forecast, end=end_forecast, freq="1H")
+    kwargs = dict(
+        window_size=24 * 7,
+        forecast_skip=1,
+        forecast_horizon=1,
+        additional_feats=[
+            "mean",
+            "std",
+            "skew",
+            "kurtosis",
+            "min",
+            "max",
+        ],
+    )
+    range_forecast = pd.date_range(start=start_forecast, end=end_forecast, freq="1h")
     forecast = pd.DataFrame(columns=training_set.columns, index=range_forecast)
-    forecast_step = 1
-    errors = pd.DataFrame(
-        columns=["abs_err", "port_err", "score"],
+
+    ar = AutoRegressor(
+        dataset_encoding=dataset_encoding,
+        model=LightGBMModel(),
+        model_path=None,
+        **kwargs,
     )
 
     for costumer in training_set.columns.values:
         customer_id = int(costumer.split("_")[-1])
         print(f"******************************************")
         print(f"Start {customer_id}")
-
-        df = dataset_encoding.generate_dataset(
-            customer_id,
-            window_size=24 * 7,
-            forecast_skip=1,
-            forecast_horizon=1,
-            additional_feats=[
-                "mean",
-                "std",
-                "skew",
-                "kurtosis",
-                "min",
-                "max",
-            ],
+        ar.setup_df(customer_id)
+        forecast[costumer] = ar.predict(customer_id)
+        plot(
+            training_set.loc[range_forecast, costumer],
+            forecast[costumer],
+            save_path=join(output_path, f"{team_name}_{zone}_{customer_id}.png"),
         )
-
-        # evaluate
-        X, y = dataset_encoding.get_train_data(df, customer_id, forecast_step=forecast_step, drop_nans_X=True)
-        abs_err, port_err, score = evaluate(X, y, f"{output_path}/{customer_id}.png")
-        errors.loc[customer_id] = [abs_err, port_err, score]
-        print(f"errors: {errors.loc[customer_id]}")
-        # consumption = training_set.loc[:, costumer]
-
-        # feature_dummy = features["temp"].loc[start_training:]
-
-        # encoding = SimpleEncoding(consumption, feature_dummy, end_training, start_forecast, end_forecast)
-
-        # feature_past, feature_future, consumption_clean = encoding.meta_encoding()
-
-        # # Train
-        # model = SimpleModel()
-        # model.train(feature_past, consumption_clean)
-
-        # # Predict
-        # output = model.predict(feature_future)
-        # forecast[costumer] = output
+        break
 
     """
     END OF THE MODIFIABLE PART.
     """
-    errors.to_csv(f"{output_path}/errors.csv")
-    print(errors.mean())
     # test to make sure that the output has the expected shape.
     dummy_error = np.abs(forecast - example_results).sum().sum()
     assert np.all(forecast.columns == example_results.columns), "Wrong header or header order."

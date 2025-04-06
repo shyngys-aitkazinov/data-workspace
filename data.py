@@ -201,7 +201,6 @@ class DatasetEncoding:
         for d in range(6):
             df[f"dow_{d}"] = (df["day_of_week"] == d).astype(int)
 
-
         # Hour as sin/cos
         df["hour_sin"] = np.sin(2 * np.pi * df["hour"] / 24)
         df["hour_cos"] = np.cos(2 * np.pi * df["hour"] / 24)
@@ -276,58 +275,44 @@ class DatasetEncoding:
         y = y.loc[start_time:end_time].sort_index()
 
         # ------------------------------------------------------
-        # 2) Generate time-based features over the same period
+        # 2) Generate time-based features over the same period (if requested)
         # ------------------------------------------------------
         if include_time_features:
             time_features = self.generate_time_series_features(start_time, end_time)
-
+            print(max(time_features.index))
             # We'll merge them on the datetime index
             df = pd.DataFrame({"consumption": y})
-            df = df.join(time_features, how="inner")  # or outer if needed
+            df = df.join(time_features, how="right")
+        else:
+            df = pd.DataFrame({"consumption": y})
 
+        print(max(df.index))
         # ------------------------------------------------------
         # 3) Create lag features (window_size hours of history)
-        #    lag_1 => consumption at t-1
-        #    lag_2 => consumption at t-2
-        #    ...
-        #    lag_{window_size} => consumption at t-window_size
         # ------------------------------------------------------
         lag_cols = {}
         for lag in range(1, window_size + 1):
             lag_cols[f"{customer_id}_lag_{lag}"] = df["consumption"].shift(lag)
-
-        # Convert dict to a DataFrame and concat once
         lag_df = pd.DataFrame(lag_cols, index=df.index)
         df = pd.concat([df, lag_df], axis=1)
 
         # ------------------------------------------------------
         # 4) Create future consumption columns (our targets)
-        #    - forecast_skip: how many hours to skip
-        #    - forecast_horizon: how many steps we want to forecast
-        #
-        #    Example:
-        #       If forecast_skip=1 and horizon=24, then for each time t,
-        #       the targets are consumption at t+1 ... t+24
         # ------------------------------------------------------
-        # Start of the forecast period is (t + forecast_skip)
-        # End of the forecast period is (t + forecast_skip + i - 1)
         future_cols = {}
         for i in range(1, forecast_horizon + 1):
             target_col = f"{customer_id}_future_{i}"
             future_cols[target_col] = df["consumption"].shift(-1 * (forecast_skip + i - 1))
-
         future_df = pd.DataFrame(future_cols, index=df.index)
         df = pd.concat([df, future_df], axis=1)
-        # ------------------------------------------------------
-        # 5) Drop rows where we don't have enough history or future
-        #    - We lose the first 'window_size' rows to lag features
-        #    - We lose the last 'forecast_skip + forecast_horizon - 1' rows
-        #      to future features
-        # ------------------------------------------------------
+        print(max(df.index))
 
+        # ------------------------------------------------------
+        # 5) Create future features from self.features and self.rollout
+        # ------------------------------------------------------
         future_feats_df_list = []
 
-        # For each column in self.features, shift backward
+        # For each column in self.features, shift backward for each forecast step
         for col in self.features.columns:
             for i in range(1, forecast_horizon + 1):
                 shift_amount = -1 * (forecast_skip + i - 1)
@@ -336,6 +321,7 @@ class DatasetEncoding:
                     pd.DataFrame({future_feat_col: self.features[col].shift(shift_amount)}, index=self.features.index)
                 )
 
+        # For rollout features (using a mapping: self.rollout_id_map)
         for i in range(1, forecast_horizon + 1):
             shift_amount = -1 * (forecast_skip + i - 1)
             future_feat_col = f"f{i}_{self.rollout_id_map[customer_id]}"
@@ -346,48 +332,53 @@ class DatasetEncoding:
                 )
             )
 
-        # Combine all the future feature DataFrames
         if future_feats_df_list:
             future_feats_big = pd.concat(future_feats_df_list, axis=1)
-            # Now slice future_feats_big to the same [start_time, end_time] index
+            # Restrict to our time range
             future_feats_big = future_feats_big.loc[start_time:end_time]
-            # Merge them into df
             df = df.join(future_feats_big, how="left")
+        print(max(df.index))
 
-        earliest_valid_row = window_size  # because lag_n needs that many back steps
-        latest_valid_row = len(df) - (forecast_skip + forecast_horizon - 1)
-        df = df.iloc[earliest_valid_row:latest_valid_row]
-
+        # ------------------------------------------------------
+        # 6) Add additional rolling statistics if requested
+        # ------------------------------------------------------
         add_dict = {}
         for add_feat in additional_feats:
             if add_feat == "mean":
-                add_dict["rolling_mean"] = df["consumption"].rolling(window=window_size).mean()
+                # Require full window for a valid mean, else NaN.
+                add_dict["rolling_mean"] = (
+                    df["consumption"].rolling(window=window_size, min_periods=window_size // 2).mean()
+                )
             elif add_feat == "std":
-                add_dict["rolling_std"] = df["consumption"].rolling(window=window_size).std()
+                add_dict["rolling_std"] = (
+                    df["consumption"].rolling(window=window_size, min_periods=window_size // 2).std()
+                )
             elif add_feat == "kurtosis":
-                add_dict["rolling_kurtosis"] = df["consumption"].rolling(window=window_size).kurt()
+                add_dict["rolling_kurtosis"] = (
+                    df["consumption"].rolling(window=window_size, min_periods=window_size // 2).kurt()
+                )
             elif add_feat == "skew":
-                add_dict["rolling_skew"] = df["consumption"].rolling(window=window_size).skew()
+                add_dict["rolling_skew"] = (
+                    df["consumption"].rolling(window=window_size, min_periods=window_size // 2).skew()
+                )
             elif add_feat == "min":
-                add_dict["rolling_min"] = df["consumption"].rolling(window=window_size).min()
+                add_dict["rolling_min"] = (
+                    df["consumption"].rolling(window=window_size, min_periods=window_size // 2).min()
+                )
             elif add_feat == "max":
-                add_dict["rolling_max"] = df["consumption"].rolling(window=window_size).max()
+                add_dict["rolling_max"] = (
+                    df["consumption"].rolling(window=window_size, min_periods=window_size // 2).max()
+                )
             else:
-                # Possibly it's a direct column name in self.features (or some external field)
-                # If it's in df already, do nothing. If it's in self.features, we can explicitly join here.
-                # For simplicity, we assume it's already joined above if it's in self.features or rollout.
-                # If you want to handle it differently, you can do so here.
                 if add_feat not in df.columns:
                     print(f"Warning: '{add_feat}' not recognized as a stat or existing column.")
-                    # Optionally do: add_dict[add_feat] = self.features[add_feat].loc[start_time:end_time]
 
-        # Concat all newly created additional features at once
         if add_dict:
             add_stats_df = pd.DataFrame(add_dict, index=df.index)
             df = pd.concat([df, add_stats_df], axis=1)
 
         # ------------------------------------------------------
-        # 6) Return the final DataFrame
+        # 7) Return the final DataFrame covering the full [start_time, end_time]
         # ------------------------------------------------------
         return df
 
@@ -418,4 +409,17 @@ class DatasetEncoding:
             to_drop = [col for col in df.columns if col.startswith(f"{customer_id}_future_")]
             X = df[mask].drop(columns=to_drop)
 
+        return X, y
+
+    def get_test_sample(
+        self,
+        df: pd.DataFrame,
+        ts: pd.Timestamp,
+        customer_id: int,
+        forecast_step: int,
+    ) -> tuple[pd.DataFrame, pd.Series]:
+        target_column = f"{customer_id}_future_{forecast_step}"
+        to_drop = [col for col in df.columns if col.startswith(f"{customer_id}_future_")]
+        X = df.drop(columns=to_drop).loc[ts : ts + pd.Timedelta(hours=1)]
+        y = df[target_column].loc[ts : ts + pd.Timedelta(hours=1)]
         return X, y
