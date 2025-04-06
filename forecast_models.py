@@ -92,6 +92,7 @@ class LightGBMModel:
             Feature matrix used for training.
         """
         print(sorted(list(zip(self.model.feature_importances_, X.columns)), reverse=True))
+        return
 
 
 class TimeOLSmodel:
