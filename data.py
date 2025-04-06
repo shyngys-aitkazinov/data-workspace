@@ -286,7 +286,6 @@ class DatasetEncoding:
         else:
             df = pd.DataFrame({"consumption": y})
 
-        print(max(df.index))
         # ------------------------------------------------------
         # 3) Create lag features (window_size hours of history)
         # ------------------------------------------------------
@@ -305,7 +304,6 @@ class DatasetEncoding:
             future_cols[target_col] = df["consumption"].shift(-1 * (forecast_skip + i - 1))
         future_df = pd.DataFrame(future_cols, index=df.index)
         df = pd.concat([df, future_df], axis=1)
-        print(max(df.index))
 
         # ------------------------------------------------------
         # 5) Create future features from self.features and self.rollout
@@ -337,7 +335,6 @@ class DatasetEncoding:
             # Restrict to our time range
             future_feats_big = future_feats_big.loc[start_time:end_time]
             df = df.join(future_feats_big, how="left")
-        print(max(df.index))
 
         # ------------------------------------------------------
         # 6) Add additional rolling statistics if requested
