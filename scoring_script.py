@@ -4,7 +4,7 @@ from os.path import join
 from datetime import datetime
 
 date_format = '%Y-%m-%d %H:%M:%S'
-student_path = r"outputs"
+student_path = r"my_outputs"
 testing_set_path = r"datasets2025"
 
 absolute_error = {}

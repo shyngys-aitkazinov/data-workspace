@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import kurtosis
 from sklearn.model_selection import TimeSeriesSplit
-from xgboost import XGBRegressor
+# from xgboost import XGBRegressor
 
 # depending on your IDE, you might need to add datathon_eth. in front of data
 from data import DataLoader, DatasetEncoding, SimpleEncoding
