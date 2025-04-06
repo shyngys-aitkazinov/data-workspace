@@ -12,7 +12,7 @@ This repository features the following shared files:
   Code to handle dataset preparation (loading, aggregation, cleaning, feature engineering).
 
 - **`baseline_models.py`**  
-  First baseline model we compared against, which didn't use any ML (merely extending last month's and one year ago consumption into the next month).
+  First baseline model we compared against, which didn't use any ML (merely naively extending last month's and one year ago consumption into the next month).
 
 - **`forecast_models.py`**  
   Includes models that we tried (although the final version uses LGBM).
