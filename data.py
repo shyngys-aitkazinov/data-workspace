@@ -279,7 +279,6 @@ class DatasetEncoding:
         # ------------------------------------------------------
         if include_time_features:
             time_features = self.generate_time_series_features(start_time, end_time)
-            print(max(time_features.index))
             # We'll merge them on the datetime index
             df = pd.DataFrame({"consumption": y})
             df = df.join(time_features, how="right")
@@ -366,10 +365,76 @@ class DatasetEncoding:
                 add_dict["rolling_max"] = (
                     df["consumption"].rolling(window=window_size, min_periods=window_size // 2).max()
                 )
-            elif add_feat == "month_ago":
-                add_dict["month_ago"] = df["consumption"].shift(freq=pd.DateOffset(months=1))
-            elif add_feat == "week_ago":
-                add_dict["week_ago"] = df["consumption"].shift(freq=pd.DateOffset(weeks=1))
+            # ---- EXAMPLES: Custom daily/weekly lags ----
+            elif add_feat == "lag_24":
+                add_dict["lag_24"] = df["consumption"].shift(24)
+            elif add_feat == "lag_48":
+                add_dict["lag_48"] = df["consumption"].shift(48)
+            elif add_feat == "lag_72":
+                add_dict["lag_72"] = df["consumption"].shift(72)
+            elif add_feat == "lag_168":
+                add_dict["lag_168"] = df["consumption"].shift(168)
+            # ---- EXAMPLE: Simple FFT-based feature on last 'window_size' points ----
+            elif add_feat == "fft":
+                # We'll extract the largest frequency amplitude in the window
+                # This is a simple demonstration – real use might require more nuanced approach
+                def fft_max_amp(series):
+                    clean = series.dropna().values
+                    if len(clean) < 2:
+                        return 0.0
+                    freqs = np.fft.fft(clean)
+                    magnitudes = np.abs(freqs)
+                    # Skip DC component if you like (magnitudes[1:]) or keep it. We'll skip it here:
+                    return magnitudes[1:].max() if len(magnitudes) > 1 else 0.0
+
+                def fft_dominant_phase(x):
+                    try:
+                        # Ensure input is a NumPy array
+                        x = np.asarray(x)
+                        if x.size == 0:
+                            return np.nan  # Return NaN for empty inputs
+
+                        # Compute the FFT of the input
+                        fft_result = np.fft.fft(x)
+                        # Compute amplitudes of the FFT result
+                        amplitude = np.abs(fft_result)
+
+                        # If the amplitudes are nearly all zero, return NaN to avoid spurious results
+                        if np.allclose(amplitude, 0):
+                            return np.nan
+
+                        # If there's more than one element, ignore the DC component (first element)
+                        if amplitude.size > 1:
+                            dominant_index = np.argmax(amplitude[1:]) + 1
+                        else:
+                            dominant_index = 0
+
+                        # Extract and return the phase at the dominant frequency index
+                        phase = np.angle(fft_result[dominant_index])
+                        return phase
+
+                    except Exception:
+                        # Return NaN if any computational issues arise
+                        return np.nan
+
+                # 1) Using the main window_size
+                add_dict["fft_max_amp"] = df["consumption"].rolling(window=window_size).apply(fft_max_amp, raw=False)
+                add_dict["fft_dom_phase"] = (
+                    df["consumption"].rolling(window=window_size).apply(fft_dominant_phase, raw=False)
+                )
+
+                # 2) Fixed windows: 1 day, 1 week, 1 month (~30d), 1 year (~365d)
+                windows_map = {
+                    "1d": 24,
+                    "1w": 168,
+                    "1m": 720,  # approx 30 days
+                    "1y": 8760,  # approx 365 days
+                }
+                for label, wsize in windows_map.items():
+                    add_dict[f"fft_{label}_max_amp"] = df["consumption"].rolling(wsize).apply(fft_max_amp, raw=False)
+                    add_dict[f"fft_{label}_phase"] = (
+                        df["consumption"].rolling(wsize).apply(fft_dominant_phase, raw=False)
+                    )
             else:
                 if add_feat not in df.columns:
                     print(f"Warning: '{add_feat}' not recognized as a stat or existing column.")
@@ -410,6 +475,15 @@ class DatasetEncoding:
             to_drop = [col for col in df.columns if col.startswith(f"{customer_id}_future_")]
             X = df[mask].drop(columns=to_drop)
 
+        X.drop(
+            columns=[
+                "consumption",
+                f"{customer_id}_lag_1",
+                f"{customer_id}_lag_2",
+            ],
+            inplace=True,
+            errors="ignore",
+        )
         return X, y
 
     def get_test_sample(
@@ -421,6 +495,6 @@ class DatasetEncoding:
     ) -> tuple[pd.DataFrame, pd.Series]:
         target_column = f"{customer_id}_future_{forecast_step}"
         to_drop = [col for col in df.columns if col.startswith(f"{customer_id}_future_")]
-        X = df.drop(columns=to_drop).loc[[ts]]
+        X = df.drop(columns=to_drop + ["consumption", f"{customer_id}_lag_1", f"{customer_id}_lag_2"]).loc[[ts]]
         y = df[target_column].loc[ts]
         return X, y

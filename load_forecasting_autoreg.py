@@ -55,7 +55,10 @@ class AutoRegressor:
 
     def train(self, customer_id: int, forecast_step=FORECAST_STEP):
         X, y = self.dataset_encoding.get_train_data(
-            self.df.loc[self.start_training : self.end_training], customer_id, forecast_step, drop_nans_X=True
+            self.df.loc[self.start_training : self.end_training],
+            customer_id,
+            forecast_step,
+            drop_nans_X=False,
         )
         self.model.fit(X, y)
         self.model.feature_importances(X)
@@ -77,9 +80,7 @@ class AutoRegressor:
         The update shifts existing lag values one step back and inserts y_pred as the new lag_1.
         """
 
-        timeseries = self.df.loc[
-            ts - pd.Timedelta(hours=self.window_size - 1) : ts + pd.Timedelta(hours=1), "consumption"
-        ]
+        timeseries = self.df.loc[ts - pd.Timedelta(hours=self.window_size) : ts, "consumption"]
 
         # For lag_i (i from 2 to window_size), set new lag value equal to the old lag_{i-1} from time ts.
         for lag in range(1, self.window_size + 1):
@@ -104,16 +105,73 @@ class AutoRegressor:
                 self.df.loc[ts, "rolling_min"] = np.min(timeseries)
             elif add_feat == "max":
                 self.df.loc[ts, "rolling_max"] = np.max(timeseries)
-            elif add_feat == "month_ago":
-                # Require full window for a valid month_ago, else NaN.
-                self.df.loc[ts, "month_ago"] = self.df.loc[
-                    ts - pd.DateOffset(months=1), f"{customer_id}_lag_{self.window_size}"
-                ]
-            elif add_feat == "week_ago":
-                # Require full window for a valid week_ago, else NaN.
-                self.df.loc[ts, "week_ago"] = self.df.loc[
-                    ts - pd.Timedelta(days=7), f"{customer_id}_lag_{self.window_size}"
-                ]
+            elif add_feat == "lag_24":
+                self.df.loc[ts, "lag_24"] = self.df.loc[ts - pd.Timedelta(hours=24), "lag_24"]
+            elif add_feat == "lag_48":
+                self.df.loc[ts, "lag_48"] = self.df.loc[ts - pd.Timedelta(hours=48), "lag_48"]
+            elif add_feat == "lag_72":
+                self.df.loc[ts, "lag_72"] = self.df.loc[ts - pd.Timedelta(hours=72), "lag_72"]
+            elif add_feat == "lag_168":
+                self.df.loc[ts, "lag_168"] = self.df.loc[ts - pd.Timedelta(hours=72), "lag_168"]
+            # ---- EXAMPLE: Simple FFT-based feature on last 'window_size' points ----
+            elif add_feat == "fft":
+                # We'll extract the largest frequency amplitude in the window
+                # This is a simple demonstration – real use might require more nuanced approach
+                def fft_max_amp(series):
+                    clean = series.dropna().values
+                    if len(clean) < 2:
+                        return 0.0
+                    freqs = np.fft.fft(clean)
+                    magnitudes = np.abs(freqs)
+                    # Skip DC component if you like (magnitudes[1:]) or keep it. We'll skip it here:
+                    return magnitudes[1:].max() if len(magnitudes) > 1 else 0.0
+
+                def fft_dominant_phase(x):
+                    try:
+                        # Ensure input is a NumPy array
+                        x = np.asarray(x)
+                        if x.size == 0:
+                            return np.nan  # Return NaN for empty inputs
+
+                        # Compute the FFT of the input
+                        fft_result = np.fft.fft(x)
+                        # Compute amplitudes of the FFT result
+                        amplitude = np.abs(fft_result)
+
+                        # If the amplitudes are nearly all zero, return NaN to avoid spurious results
+                        if np.allclose(amplitude, 0):
+                            return np.nan
+
+                        # If there's more than one element, ignore the DC component (first element)
+                        if amplitude.size > 1:
+                            dominant_index = np.argmax(amplitude[1:]) + 1
+                        else:
+                            dominant_index = 0
+
+                        # Extract and return the phase at the dominant frequency index
+                        phase = np.angle(fft_result[dominant_index])
+                        return phase
+
+                    except Exception:
+                        # Return NaN if any computational issues arise
+                        return np.nan
+
+                # 1) Using the main window_size
+                self.df.loc[ts, "fft_max_amp"] = fft_max_amp(timeseries)
+                self.df.loc[ts, "fft_dom_phase"] = fft_dominant_phase(timeseries)
+
+                # 2) Fixed windows: 1 day, 1 week, 1 month (~30d), 1 year (~365d)
+                windows_map = {
+                    "1d": 24,
+                    "1w": 168,
+                    "1m": 720,  # approx 30 days
+                    "1y": 8760,  # approx 365 days
+                }
+                for label, wsize in windows_map.items():
+                    timeseries_wsize = self.df.loc[ts - pd.Timedelta(hours=wsize) : ts, "consumption"]
+                    self.df.loc[ts, f"fft_{label}_max_amp"] = fft_max_amp(timeseries_wsize)
+                    self.df.loc[ts, f"fft_{label}_phase"] = fft_dominant_phase(timeseries_wsize)
+
             else:
                 if add_feat not in self.df.columns:
                     print(f"Warning: '{add_feat}' not recognized as a stat or existing column.")
@@ -187,25 +245,6 @@ def evaluate_forecast(y_true, y_pred):
     return country_error, abs(portfolio_country_error)
 
 
-# def evaluate(X: pd.DataFrame, y: pd.Series, save_path: str, my_predictor):
-#     """
-#     Runs cross-validation with a given predictor.
-#     Returns:
-#       abs_err, port_err, score, abs_err_std, port_err_std, score_std
-#     """
-#     results = cross_validate_forecaster(
-#         predictor=my_predictor,
-#         X=X,
-#         y=y,
-#         verbose=True,
-#         save_path=save_path,  # not currently used to save anything, but left for clarity
-#     )
-
-#     (abs_err, port_err, score, abs_err_std, port_err_std, score_std) = results
-
-#     return abs_err, port_err, score, abs_err_std, port_err_std, score_std
-
-
 def main(zone: str):
     """
 
@@ -216,8 +255,6 @@ def main(zone: str):
     # Inputs
     input_path = r"datasets2025"
     output_path = r"outputs"
-    # models_path = r"models_path"
-    models_path = None
 
     # Load Datasets
     loader = DataLoader(input_path)
@@ -231,6 +268,8 @@ def main(zone: str):
     # Add additional data to features
 
     team_name = "HANGUK_ML"
+    # models_path = r"models_path"
+    models_path = None
     # Data Manipulation and Training
     # start_training = training_set.index.min()
     # end_training = training_set.index.max()
@@ -255,7 +294,7 @@ def main(zone: str):
     )
 
     kwargs = dict(
-        window_size=24 * 7,
+        window_size=72,
         forecast_skip=1,
         forecast_horizon=1,
         additional_feats=[
@@ -265,8 +304,11 @@ def main(zone: str):
             "kurtosis",
             "min",
             "max",
-            # "month_ago",
-            # "week_ago",
+            # "lag_24",
+            # "lag_48",
+            "lag_72",
+            "lag_168",
+            "fft",
         ],
     )
     range_forecast = pd.date_range(start=start_forecast, end=end_forecast, freq="1h")
@@ -274,7 +316,11 @@ def main(zone: str):
 
     ar = AutoRegressor(
         dataset_encoding=dataset_encoding,
-        model=LightGBMModel(objective="regression_l1", n_estimators=300),  # or "binary", "multiclass", etc),
+        model=LightGBMModel(
+            objective="huber",
+            n_estimators=300,
+            learning_rate=0.2,
+        ),  # or "binary", "multiclass", etc),
         # model=ELasticNetModel(),
         model_path=None,
         **kwargs,
@@ -286,11 +332,15 @@ def main(zone: str):
         print(f"Start {customer_id}")
         ar.setup_df(customer_id)
         forecast[costumer] = ar.predict(customer_id)
+
+        # Make sure to set negative values to 0.001
+        forecast[costumer][forecast[costumer] < 0.0] = 0.001
         plot(
             training_set.loc[range_forecast, costumer],
             forecast[costumer],
             save_path=join(output_path, f"{team_name}_{zone}_{customer_id}.png"),
         )
+        print(evaluate_forecast(training_set.loc[range_forecast, costumer], forecast[costumer]))
         break
 
     """
