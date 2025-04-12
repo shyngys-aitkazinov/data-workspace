@@ -5,13 +5,13 @@ description = "Solution for onboarding clients with AI algorithm"
 readme = "README.md"
 requires-python = "==3.10.*"
 dependencies = [
-    "docx>=0.2.4",
     "matplotlib>=3.10.1",
     "numpy>=2.2.4",
     "pandas>=2.2.3",
     "pillow>=11.1.0",
     "pip>=25.0.1",
     "pydantic>=2.11.3",
+    "python-docx>=1.1.2",
     "torch>=2.6.0",
 ]
 
