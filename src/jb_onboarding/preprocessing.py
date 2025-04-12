@@ -36,13 +36,13 @@ class PassportParser:
             model_id (str): Hugging Face model identifier for the InternVL2_5 variant.
                             Defaults to "OpenGVLab/InternVL2_5-1B".
         """
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = AutoModel.from_pretrained(
             model_id,
             trust_remote_code=True,
-            torch_dtype=torch.float32,  # Use full precision on CPU
+            torch_dtype=torch.float32,  # Keep or adjust as desired
             low_cpu_mem_usage=False,
-        ).eval()
-
+        ).to(self.device).eval()
         self.tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
 
     def __call__(self, path_to_passport: PathLike) -> str:
@@ -70,7 +70,7 @@ class PassportParser:
 
         # Apply the transformations and add a batch dimension.
         image_tensor = transform(image)
-        pixel_values = image_tensor.unsqueeze(0)  # Shape: [1, 3, 448, 448]
+        pixel_values = image_tensor.unsqueeze(0).to(self.device)  # Shape: [1, 3, 448, 448]
 
         # Prepare the OCR prompt using the special <image> token.
         prompt = (
