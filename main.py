@@ -114,7 +114,7 @@ def main():
     client_idx = max(client_idx) + 1 if client_idx else 1
 
     while True:
-        input("Press Enter to continue the game...")
+        # input("Press Enter to continue the game...")
 
         # Start the game session
         session_id, client_id, score, client_data = start_game_session()
