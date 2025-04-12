@@ -1,6 +1,8 @@
 import base64
 import os
+import time
 import zipfile
+from collections import deque
 from os import PathLike
 
 import requests
@@ -11,6 +13,29 @@ from jb_onboarding.preprocessing import Preprocessor
 API_KEY = "A8wwei-7ZHtA2TUFRW5AMRiwoFRijgAaIYO0AR6qeDk"
 TEAM_NAME = "HANGUK ML"
 BASE_URL = "https://hackathon-api.mlo.sehlat.io"
+
+
+RATE_LIMIT = 60
+
+
+def check_rate_limit(time_queue: deque, sleep_time: int = 2):
+    """
+    Checks whether the rate limit of 60 calls per minute has been reached.
+    If so, sleeps until the current minute window has passed.
+    """
+
+    cur_time = time.time()
+
+    # Remove timestamps older than 60 seconds from the queue
+    while True:
+        cur_time = time.time()
+        while time_queue and cur_time - time_queue[0] > 60:
+            time_queue.popleft()
+
+        if len(time_queue) < RATE_LIMIT:
+            return
+
+        time.sleep(sleep_time)
 
 
 def start_game_session() -> tuple[str, str, str, dict]:
@@ -82,6 +107,7 @@ def main():
     os.makedirs("output", exist_ok=True)
     prep = Preprocessor()
 
+    time_queue = deque([])
     game_idx = 0
     client_idx = os.listdir("output")
     client_idx = [int(x.split("_")[1]) for x in client_idx if x.endswith(".zip")]
@@ -98,6 +124,7 @@ def main():
             continue
 
         while True:
+            check_rate_limit(time_queue)
             account = base64.b64decode(client_data.get("account"))
             description = base64.b64decode(client_data.get("description"))
             passport = base64.b64decode(client_data.get("passport"))
@@ -112,19 +139,24 @@ def main():
             )
             decision = get_decision(client_meta)
             result, err = make_decision(session_id, client_id, decision)
+            time_queue.append(time.time())
 
-            if result is None:
+            if result.get("status", "OK") == "gameover":
                 label = "Accept" if decision == "Reject" else "Reject"
-                if err != 429:
-                    save_erroneous_sample(account, description, passport, profile, client_idx, label)
-                    client_idx += 1
+                save_erroneous_sample(account, description, passport, profile, client_idx, label)
+                game_idx += 1
+                client_idx += 1
+                break
+            elif err:
+                print("HTTP Error:", err)
                 game_idx += 1
                 break
             else:
                 client_data = result.get("client_data")
                 score = result.get("score")
-            save_erroneous_sample(account, description, passport, profile, client_idx, decision)
-            client_idx += 1
+                client_id = result.get("client_id")
+            # save_erroneous_sample(account, description, passport, profile, client_idx, decision)
+            # client_idx += 1
             print(f"Game {game_idx} - score {score}")
 
 
