@@ -3,7 +3,7 @@ name = "ai-client-onboarding"
 version = "0.1.0"
 description = "Solution for onboarding clients with AI algorithm"
 readme = "README.md"
-requires-python = "==3.10.*"
+requires-python = ">=3.10"
 dependencies = [
     "matplotlib>=3.10.1",
     "numpy>=2.2.4",
