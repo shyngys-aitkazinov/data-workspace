@@ -100,6 +100,11 @@ class PassportParser:
         #             except ValueError:
         #                 print(f"Invalid date format for {key}: {date_str}")
 
+        # get the signature
+        signature = image.crop((239, 210, 359, 242)).tobytes()
+        image.crop((239, 213, 359, 242)).save("signature.png")
+        passport_data["Signature"] = base64.b64encode(signature).decode("utf-8")
+
         return passport_data
 
 
@@ -189,9 +194,18 @@ class Preprocessor:
                 continue
             for row in table_data:
                 key = row[0] if row[0] else None
-                if not key:
-                    continue
+                # For the value, lookthrough the remaining cells for non-empty content.
+                # (Sometimes there might be multiple pieces of information.)
                 value_candidates = [cell for cell in row[1:] if cell]
+                inline_value = None
+                if not value_candidates and row[0]:
+                    inline_kv_pattern = r"(\bE-?Mail\b|Telephone)\s+([\w@.\-+ ]+)"
+                    inline_matches = re.findall(inline_kv_pattern, row[0])
+                    for k, v in inline_matches:
+                        key = k.strip()
+                        inline_value = v.strip()
+                        result[current_section][key] = inline_value
+                    continue  # Skip further processing since we’ve already stored it
                 if not value_candidates:
                     value = None
                 elif len(value_candidates) == 1:
@@ -268,8 +282,10 @@ class Preprocessor:
         mat = fitz.Matrix(zoom, zoom)
         try:
             pix = page.get_pixmap(matrix=mat, clip=target_rect)
+            pix.save("signature1.png")
             png_bytes = pix.tobytes("png")
             return base64.b64encode(png_bytes).decode("utf-8")
+
         except Exception as e:
             print(f"Error extracting signature region: {e}")
             return None

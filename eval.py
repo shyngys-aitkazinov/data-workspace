@@ -58,6 +58,8 @@ def eval():
     prep = Preprocessor()
 
     for client_id, dataset_item in dataset:
+        if client_id == 1:
+            continue
         print(f"Processing client {client_id}...")
         # Open and parse the file
         client_data = prep(dataset_item)
