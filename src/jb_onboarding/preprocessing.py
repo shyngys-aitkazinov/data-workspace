@@ -1,4 +1,5 @@
 import base64
+import io
 import json
 import os
 import re
@@ -6,6 +7,7 @@ import zipfile
 from datetime import datetime
 from io import BytesIO
 from os import PathLike
+from typing import Any, BinaryIO
 
 import fitz
 import matplotlib.pyplot as plt
@@ -17,6 +19,10 @@ from torchvision import transforms
 from transformers import AutoModel, AutoTokenizer
 
 from jb_onboarding.constants import DOCS
+
+FileInput = str | bytes | BinaryIO
+
+fitz.TOOLS.mupdf_display_errors(False)
 
 
 class PassportParser:
@@ -125,37 +131,140 @@ class Preprocessor:
         self.kwargs = kwargs
         self.passport_parser = PassportParser()
 
-    def __call__(self, path_to_zip):
-        temp_dir = str(path_to_zip).replace(".zip", "")
-        with zipfile.ZipFile(path_to_zip, "r") as zip_ref:
-            zip_ref.extractall(temp_dir)
-            names = zip_ref.namelist()
-            # profile.docx
-            if "profile.docx" not in names:
-                raise FileNotFoundError("profile.docx not found in the zip archive.")
-            with zip_ref.open("profile.docx") as profile_file:
-                doc = Document(profile_file)
-                profile_json = self._parse_profile_docx_to_json(doc)
+    # def __call__(self, path_to_zip, passport, description, account, profile):
+
+    #     temp_dir = str(path_to_zip).replace(".zip", "")
+    #     with zipfile.ZipFile(path_to_zip, "r") as zip_ref:
+    #         zip_ref.extractall(temp_dir)
+    #         names = zip_ref.namelist()
+    #         # profile.docx
+    #         if "profile.docx" not in names:
+    #             raise FileNotFoundError("profile.docx not found in the zip archive.")
+    #         with zip_ref.open("profile.docx") as profile_file:
+    #             doc = Document(profile_file)
+    #             profile_json = self._parse_profile_docx_to_json(doc)
+
+    #         # passport.png
+    #         if "passport.png" not in names:
+    #             raise FileNotFoundError("passport.png not found in the zip archive.")
+    #         passport_data = self.passport_parser(os.path.join(temp_dir, "passport.png"))
+
+    #         # description.txt
+    #         if "description.txt" not in names:
+    #             raise FileNotFoundError("description.txt not found in the zip archive.")
+    #         with zip_ref.open("description.txt") as desc_file:
+    #             raw_desc = desc_file.read().decode("utf-8")
+    #             description_json = self._parse_description(raw_desc)
+
+    #         # account.pdf
+    #         if "account.pdf" not in names:
+    #             raise FileNotFoundError("account.pdf not found in the zip archive.")
+    #         with zip_ref.open("account.pdf") as pdf_file:
+    #             account_pdf_bytes = pdf_file.read()
+    #     account_parsed = self._extract_form_data_and_signature(account_pdf_bytes)
+    #     output = {
+    #         "profile": profile_json,
+    #         "passport": passport_data,
+    #         "description": description_json,
+    #         "account": account_parsed,
+    #     }
+    #     return output
+    def __call__(
+        self,
+        path_to_zip: str,
+        passport: FileInput | None = None,
+        description: FileInput | None = None,
+        account: FileInput | None = None,
+        profile: FileInput | None = None,
+    ) -> dict[str, Any]:
+        # Determine how to treat the zip archive itself.
+        if isinstance(path_to_zip, str):
+            # If we have a file path, derive temporary extraction dir from the name.
+            temp_dir = str(path_to_zip).replace(".zip", "")
+            with zipfile.ZipFile(path_to_zip, "r") as zip_ref:
+                zip_ref.extractall(temp_dir)
+                names = zip_ref.namelist()
+                # profile.docx
+                if "profile.docx" not in names:
+                    raise FileNotFoundError("profile.docx not found in the zip archive.")
+                with zip_ref.open("profile.docx") as profile_file:
+                    doc = Document(profile_file)
+                    profile_json = self._parse_profile_docx_to_json(doc)
+
+                # passport.png
+                if "passport.png" not in names:
+                    raise FileNotFoundError("passport.png not found in the zip archive.")
+                passport_data = self.passport_parser(os.path.join(temp_dir, "passport.png"))
+
+                # description.txt
+                if "description.txt" not in names:
+                    raise FileNotFoundError("description.txt not found in the zip archive.")
+                with zip_ref.open("description.txt") as desc_file:
+                    raw_desc = desc_file.read().decode("utf-8")
+                    description_json = self._parse_description(raw_desc)
+
+                # account.pdf
+                if "account.pdf" not in names:
+                    raise FileNotFoundError("account.pdf not found in the zip archive.")
+                with zip_ref.open("account.pdf") as pdf_file:
+                    account_pdf_bytes = pdf_file.read()
+            account_parsed = self._extract_form_data_and_signature(account_pdf_bytes)
+            output = {
+                "profile": profile_json,
+                "passport": passport_data,
+                "description": description_json,
+                "account": account_parsed,
+            }
+            return output
+        else:
+            # Process profile.docx
+            if isinstance(profile, bytes):
+                profile_file = io.BytesIO(profile)
+            elif hasattr(profile, "read"):
+                profile_file = profile
+            else:  # assume a file path
+                profile_file = open(profile, "rb")
+            doc = Document(profile_file)
+            profile_json = self._parse_profile_docx_to_json(doc)
+            # Close file if we opened it ourselves
+            if not hasattr(profile, "read"):
+                profile_file.close()
 
             # passport.png
-            if "passport.png" not in names:
-                raise FileNotFoundError("passport.png not found in the zip archive.")
-            passport_data = self.passport_parser(os.path.join(temp_dir, "passport.png"))
+            if isinstance(passport, bytes):
+                passport_file = io.BytesIO(passport)
+            elif hasattr(passport, "read"):
+                passport_file = passport
+            else:
+                passport_file = open(passport, "rb")
+            passport_data = self.passport_parser(passport_file)
+            if not hasattr(passport, "read"):
+                passport_file.close()
 
-            # description.txt
-            if "description.txt" not in names:
-                raise FileNotFoundError("description.txt not found in the zip archive.")
-            with zip_ref.open("description.txt") as desc_file:
-                raw_desc = desc_file.read().decode("utf-8")
-                description_json = self._parse_description(raw_desc)
+            # Process description.txt
 
-            # account.pdf
-            if "account.pdf" not in names:
-                raise FileNotFoundError("account.pdf not found in the zip archive.")
-            with zip_ref.open("account.pdf") as pdf_file:
-                account_pdf_bytes = pdf_file.read()
+            if isinstance(description, bytes):
+                raw_desc = description.decode("utf-8")
+            elif hasattr(description, "read"):
+                raw_desc = description.read().decode("utf-8")
+            else:
+                with open(description, "rb") as f:
+                    raw_desc = f.read().decode("utf-8")
+            description_json = self._parse_description(raw_desc)
+
+            # Process account.pdf
+
+            if isinstance(account, bytes):
+                account_pdf_bytes = account
+            elif hasattr(account, "read"):
+                account_pdf_bytes = account.read()
+            else:
+                with open(account, "rb") as f:
+                    account_pdf_bytes = f.read()
+
         account_parsed = self._extract_form_data_and_signature(account_pdf_bytes)
-        output = {
+
+        output: dict[str, Any] = {
             "profile": profile_json,
             "passport": passport_data,
             "description": description_json,
