@@ -78,7 +78,9 @@ class PassportParser:
             "  - Citizenship\n"
             "  - Sex\n"
             "  - Issue Date\n"
-            "  - Expiry Date\n\n"
+            "  - Expiry Date\n"
+            "  - MRZ line 1\n"
+            "  - MRZ line 2\n"
             "For any field that is missing in the image, use an empty string as the value. Do not include any extra keys or text outside of the JSON."
         )
 
