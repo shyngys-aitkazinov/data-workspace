@@ -1,69 +1,154 @@
-# HANGUK ML team: ⚡ Load Forecasting with Autoregressive Modeling 
+# JULIUS BÄR
+## Onboard Quest - Improve Client Onboarding Efficiency in Private Banking using Machine Learning and Gamification
+In private banking, the onboarding process requires verifying client information against a set of regulatory rules to ensure compliance. This manual process is often time-consuming and error-prone, leading to delays and a poor customer experience. Inconsistencies in documentation represent another major challenge. Onboarding can involve analysing 200-300 pages of information and contracts, where discrepancies are not only common but also significantly impact efficiency. Document and data analysis may seem mundane, but the pain today is substantial.
 
-This repository focuses on forecasting load on the energy grid using autoregressive modeling. It includes all components from data preparation and baseline modeling to training machine learning models and evaluating them using time-series cross-validation.
+---
 
-## 📦 Installation
-
-To install the dependencies using [Poetry](https://python-poetry.org/):
-
-```bash
-pip install poetry
-poetry install
-```
-
-## 📁 File Structure
+## Project Structure
 
 ```bash
-.
-├── outputs/                                 # Generated outputs (predictions)
-│   ├── students_results_HANGUK_ML_ES.csv    # Prediction results for Spain region (CSV format)
-│   └── students_results_HANGUK_ML_IT.csv    # Prediction results for Italy region (CSV format)
-├── __init__.py                              # Marks this directory as a Python package
-├── .gitignore                               # Git ignore rules
-├── .python-version                          # Python version for the environment
-├── baseline_models.py                       # Naive baselines (e.g., last year/month copy)
-├── data.py                                  # Data loading, cleaning, aggregation, and feature engineering
-├── environmentAlpiqDatathon.yml             # Conda environment (from Alpiq Datathon)
-├── eval_parallel.ipynb                      # 5-fold time-series cross-validation notebook
-├── forecast_models.py                       # Forecasting models (mainly LightGBM)
-├── LICENSE                                  # Repository license
-├── load_forecasting_autoreg.py              # Multi-step autoregressive energy grid load forecasting
-├── poetry.toml                              # Poetry configuration
-├── pyproject.toml                           # Dependency and build configuration
-├── README.md                                # You're here!
-├── results.json                             # Evaluation metrics and model predictions
-└── scoring_script.py                        # Script score the final predictions
+├── LICENSE
+├── README.md                        # You're reading this!
+├── data
+│   └── ...
+├── main.py                          # Main script or entry point
+├── notebooks
+│   └── test_prediction.ipynb
+├── pyproject.toml                   # Project 
+└── uv.lock                          # uv-specific lock file
+```
+- **`notebooks/`**: Jupyter notebooks for exploration and prototyping.
+- **`main.py`**: Example script or possible CLI entry point.
+- **`pyproject.toml`**: Defines project requirements, build system, and metadata.
+
+## Prerequisites
+
+- **Python 3.10** (Make sure you have Python 3.10.x installed)
+- **uv** (a fast Python package manager) or **pip** (standard Python installer)
+
+### Installing uv
+
+**macOS/Linux**:
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-## 🧩 Key Files
-`load_forecasting_autoreg.py`
-Supports forecasting multiple timesteps ahead using an autoregressive loop with a 1-step-ahead model. Dynamically extends features to account for each predicted step.
+**Windows** (Powershell):
+```powershell
+irm https://astral.sh/uv/install.ps1 | iex
+```
 
-`eval_parallel.ipynb`
-Contains the full cross-validation pipeline (5-fold, time-series aware) for model comparison and feature experimentation.
+---
 
-`data.py`
-Prepares the dataset: loading, aggregating, cleaning, and feature engineering.
+## Installation
 
-`baseline_models.py`
-Implements naive baselines using historical consumption (e.g., last month, same time last year).
+### Option A: Using `uv` (Recommended)
 
-`forecast_models.py`
-Implements various forecasting models. The final version uses LightGBM for its performance and interpretability.
+1. **Clone the repository**:
+   ```bash
+   git clone git@github.com:shyngys-aitkazinov/data-workspace.git
+   cd data-workspace
+   git checkout feature/julius_baer
+   ```
 
-`scoring_script.py`
-Produces a score from the final model predictions.
+2. **Create and activate a virtual environment**:
+   ```bash
+   uv venv --python 3.10
+   source .venv/bin/activate
+   ```
+   *(On Windows, use `./.venv/Scripts/activate`)*
 
-`results.json`
-Stores evaluations for model and hyperparameter selection.
+3. **Install the project**:
+   ```bash
+   uv sync
+   ```
+   This installs all required dependencies from `pyproject.toml`.
 
-`environmentAlpiqDatathon.yml`
-Conda environment definition used during the Alpiq Datathonpy.
+4. **(Optional) Install dev dependencies**:
+   ```bash
+   uv sync --all-extras
+   ```
 
-## Presentation
+5. **(Optional) Editable Install** (like `pip install -e .`):
+   ```bash
+   uv pip install -e .
+   ```
+   Allows immediate reflection of code changes.
 
-Feel free to learn more about our approach and the highlights of our model in the attached `presentation.pdf` file
+6. **Install specific  pip dependencies**:
+   ```bash
+   uv pip install 'transformers[torch]'
+   ```
 
-## Important note!
+### Option B: Using standard pip
 
-Please use 'HANGUK_ML' for scoring; this is the name we use in our output files
+1. **Clone the repository**:
+   ```bash
+   git clone git@github.com:shyngys-aitkazinov/data-workspace.git
+   cd data-workspace
+   ```
+2. **Create and activate a Python 3.10 virtual environment**:
+   ```bash
+   python3.10 -m venv .venv
+   source .venv/bin/activate
+   ```
+3. **Install dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
+   or
+   ```bash
+   pip install -e .
+   ```
+### Check your installation
+```bash
+python -c "import torch; print('Package loaded, OK!')"
+```
+---
+
+## Usage
+
+After installing, run:
+```bash
+python main.py
+```
+
+---
+
+## Development
+
+1. **Install dev dependencies** (if you haven’t already):
+   ```bash
+   uv sync --all-extras
+   ```
+2. **Lint and format**:
+   ```bash
+   ruff check . --fix
+   ```
+3. **Type checking**:
+   ```bash
+   mypy .
+   ```
+4. ** VSCode**: Download ruff and mypy extensions for linting and type checking.
+---
+
+## Troubleshooting
+
+- **Multiple top-level packages**: If you see an error about multiple packages discovered (e.g., `data`, `notebooks`, etc.), the `src` layout ensures that only `src/your_package` is treated as a package.
+- **Missing library stubs**: If MyPy complains, add `ignore_missing_imports = true` under `[tool.mypy]` in `pyproject.toml`. Aternatively, add a `# type: ignore` comment to the line.
+  
+- **Git-based installs**: If `uv` fails for certain Git-based sources, manually install with:
+  ```bash
+  pip install git+https://github.com/some_project/some_repo.git
+  ```
+  or try
+  ```bash
+  uv pip install some_package
+  ```
+
+---
+
+## License
+MIT License. See `LICENSE` for details.
+
+
