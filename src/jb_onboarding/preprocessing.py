@@ -131,44 +131,6 @@ class Preprocessor:
         self.kwargs = kwargs
         self.passport_parser = PassportParser()
 
-    # def __call__(self, path_to_zip, passport, description, account, profile):
-
-    #     temp_dir = str(path_to_zip).replace(".zip", "")
-    #     with zipfile.ZipFile(path_to_zip, "r") as zip_ref:
-    #         zip_ref.extractall(temp_dir)
-    #         names = zip_ref.namelist()
-    #         # profile.docx
-    #         if "profile.docx" not in names:
-    #             raise FileNotFoundError("profile.docx not found in the zip archive.")
-    #         with zip_ref.open("profile.docx") as profile_file:
-    #             doc = Document(profile_file)
-    #             profile_json = self._parse_profile_docx_to_json(doc)
-
-    #         # passport.png
-    #         if "passport.png" not in names:
-    #             raise FileNotFoundError("passport.png not found in the zip archive.")
-    #         passport_data = self.passport_parser(os.path.join(temp_dir, "passport.png"))
-
-    #         # description.txt
-    #         if "description.txt" not in names:
-    #             raise FileNotFoundError("description.txt not found in the zip archive.")
-    #         with zip_ref.open("description.txt") as desc_file:
-    #             raw_desc = desc_file.read().decode("utf-8")
-    #             description_json = self._parse_description(raw_desc)
-
-    #         # account.pdf
-    #         if "account.pdf" not in names:
-    #             raise FileNotFoundError("account.pdf not found in the zip archive.")
-    #         with zip_ref.open("account.pdf") as pdf_file:
-    #             account_pdf_bytes = pdf_file.read()
-    #     account_parsed = self._extract_form_data_and_signature(account_pdf_bytes)
-    #     output = {
-    #         "profile": profile_json,
-    #         "passport": passport_data,
-    #         "description": description_json,
-    #         "account": account_parsed,
-    #     }
-    #     return output
     def __call__(
         self,
         path_to_zip: str,
@@ -406,5 +368,3 @@ class Preprocessor:
         signature_b64 = self._extract_signature_by_coordinates(pdf_bytes)
         form_data["signature"] = signature_b64
         return form_data
-
-
