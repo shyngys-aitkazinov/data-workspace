@@ -73,8 +73,7 @@ class PassportParser:
             "  - Surname\n"
             "  - Code\n"
             "  - Passport Number\n"
-            "  - First Name\n"
-            "  - Middle Name\n"
+            "  - Given Name\n"
             "  - Birth Date\n"
             "  - Citizenship\n"
             "  - Sex\n"
@@ -91,15 +90,15 @@ class PassportParser:
         # Decode the output and convert it to a JSON object.
         passport_data = json.loads(output[8:-3])
 
-        for key in passport_data:
-            if "Date" in key:
-                # Convert date strings to the format
-                date_str = passport_data[key]
-                if date_str:
-                    try:
-                        passport_data[key] = datetime.strptime(date_str, "%d-%b-%Y")
-                    except ValueError:
-                        print(f"Invalid date format for {key}: {date_str}")
+        # for key in passport_data:
+        #     if "Date" in key:
+        #         # Convert date strings to the format
+        #         date_str = passport_data[key]
+        #         if date_str:
+        #             try:
+        #                 passport_data[key] = datetime.strptime(date_str, "%d-%b-%Y")
+        #             except ValueError:
+        #                 print(f"Invalid date format for {key}: {date_str}")
 
         return passport_data
 

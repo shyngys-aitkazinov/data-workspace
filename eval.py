@@ -1,3 +1,4 @@
+import json
 import os
 import pathlib
 import re
@@ -48,36 +49,29 @@ def get_dataset(data_path: PathLike) -> list[tuple[int, pathlib.Path]]:
     return sorted(paths)
 
 
-def open_n_parse(file_path: PathLike) -> dict:
-    """
-    Open and parse a file.
-
-    This function is a placeholder for the actual implementation that
-    would open and parse the file at `file_path`. The implementation
-    will depend on the file format (e.g., PDF, DOCX, TXT).
-
-    Args:
-        file_path (PathLike): Path to the file to be opened and parsed.
-
-    Returns:
-        dict: Parsed content of the file.
-    """
-    prep = Preprocessor()
-    # Assuming the Preprocessor class has a method to handle file parsing
-    result = prep(
-        file_path,
-        DOCS,
-    )
-    # Placeholder for actual parsing logic
-    return result
-
-
 def eval():
     print("Collecting dataset...")
     dataset = get_dataset(DATA_PATH)
     print(f"Dataset collected: {len(dataset)} files.")
 
     print(dataset[0])
+    prep = Preprocessor()
+
+    for client_id, dataset_item in dataset:
+        print(f"Processing client {client_id}...")
+        # Open and parse the file
+        client_data = prep(dataset_item)
+
+        print(client_data)
+
+        with open(f"{client_id}.json", "w") as f:
+            # Assuming client_data is a dictionary or list that can be serialized to JSON
+            json.dump(client_data, f, indent=4)
+
+        break
+
+        # Placeholder for further processing of parsed data
+        print(f"Parsed data for client {client_id}: {parsed_data}")
 
 
 if __name__ == "__main__":
