@@ -10,7 +10,7 @@ def client_profile_and_passport_are_consistent(client_profile, passport):
     passport_first_name = name_parts[0] if name_parts else ""
     passport_middle_name = " ".join(name_parts[1:]) if len(name_parts) > 1 else ""
     passport_last_name = passport.get("Surname", "").strip()
-    
+
     # Construct full name variations:
     if passport_middle_name:
         passport_full_name = f"{passport_first_name} {passport_middle_name} {passport_last_name}".strip()
@@ -42,7 +42,7 @@ def client_profile_and_passport_are_consistent(client_profile, passport):
         profile_gender = selected[0].strip() if selected else ""
     else:
         profile_gender = str(gender_info).strip()
-    
+
     profile_passport_number = client_info.get("Passport No/ Unique ID", "").strip()
     profile_issue_date_str = client_info.get("ID Issue Date", "").strip()
     profile_expiry_date_str = client_info.get("ID Expiry Date", "").strip()

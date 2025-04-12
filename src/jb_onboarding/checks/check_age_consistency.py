@@ -12,7 +12,7 @@ def age_is_consistent(description, profile):
     For profile:
       - The birth date is expected to be found at profile["Client Information"]["Date of birth"].
       - (If not found there, an alternate key "birth_date" is also checked.)
-      
+
     For description:
       - The function looks for a pattern like "(\d+)\s+year old" in the text
         of either the "Summary Note" or "Occupation History" fields.

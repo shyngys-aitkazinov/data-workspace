@@ -11,12 +11,12 @@ def education_is_consistent(description, profile):
       - The profile dictionary contains a single education record under:
             profile["Account Holder – Personal Info"]["Education History"]
         For example: "University of Turku (1989)"
-      
-      - The description dictionary is expected to have an "Education Background" key 
-        containing free-text education details, which should include both the institution name 
+
+      - The description dictionary is expected to have an "Education Background" key
+        containing free-text education details, which should include both the institution name
         and a 4-digit graduation year.
 
-    The function extracts the institution name and year from the profile, then verifies that 
+    The function extracts the institution name and year from the profile, then verifies that
     both are present (as substrings) somewhere in the education background text.
     """
     # --- Extract education info from profile ---
@@ -28,7 +28,7 @@ def education_is_consistent(description, profile):
     # Try to extract a 4-digit year from the education information.
     year_match = re.search(r"(19|20)\d{2}", edu_profile)
     year = year_match.group(0) if year_match else ""
-    
+
     # Assume the institution name is the part before an opening parenthesis (if present),
     # otherwise use the whole string.
     if "(" in edu_profile:
