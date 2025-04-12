@@ -297,3 +297,51 @@ class Preprocessor:
         signature_b64 = self._extract_signature_by_coordinates(pdf_bytes)
         form_data["signature"] = signature_b64
         return form_data
+
+
+    def remap_fields(self, passport: dict) -> dict:
+        """
+        Remaps the passport fields from the original format to the required output format.
+        
+        Mapping details:
+            - "Given Name" -> split into `first_name` and `middle_name`
+            - "Surname" -> `last_name`
+            - "Passport Number" -> `passport_number`
+            - "Birth Date" -> `birth_date`
+            - "Sex" -> `gender`
+            - "Issue Date" -> `passport_issue_date`
+            - "Expiry Date" -> `passport_expiry_date`
+            - "MRZ Line 1" and "MRZ Line 2" -> combined into a list under `passport_mrz`
+            - "Code" -> both `country` and `country_code`
+            - "Citizenship" -> `nationality`
+        
+        Args:
+            passport (dict): The original passport data dictionary.
+            
+        Returns:
+            dict: A new dictionary with remapped fields.
+        """
+        new_passport = {}
+
+        given_name = passport.get("Given Name", "").strip()
+        name_parts = given_name.split()
+        new_passport["first_name"] = name_parts[0] if name_parts else ""
+        new_passport["middle_name"] = " ".join(name_parts[1:]) if len(name_parts) > 1 else ""
+        
+        new_passport["last_name"] = passport.get("Surname", "").strip()
+        new_passport["passport_number"] = passport.get("Passport Number", "").strip()
+        new_passport["birth_date"] = passport.get("Birth Date", "").strip()
+        new_passport["gender"] = passport.get("Sex", "").strip()
+        new_passport["passport_issue_date"] = passport.get("Issue Date", "").strip()
+        new_passport["passport_expiry_date"] = passport.get("Expiry Date", "").strip()
+        
+        mrz_line_1 = passport.get("MRZ Line 1", "").strip()
+        mrz_line_2 = passport.get("MRZ Line 2", "").strip()
+        new_passport["passport_mrz"] = [mrz_line_1, mrz_line_2]
+        
+        code = passport.get("Code", "").strip()
+        new_passport["country"] = code
+        new_passport["country_code"] = code
+        new_passport["nationality"] = passport.get("Citizenship", "").strip()
+        
+        return new_passport
