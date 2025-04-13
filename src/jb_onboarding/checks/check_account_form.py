@@ -1,6 +1,16 @@
 import json
 from pathlib import Path
 
+from email_validator import EmailNotValidError, validate_email
+
+
+def email_validator_address(email):
+    try:
+        valid = validate_email(email)
+        return True, valid.email
+    except EmailNotValidError as e:
+        return False, str(e)
+
 
 def check_name_consistency_account(data):
     """
@@ -18,7 +28,6 @@ def check_name_consistency_account(data):
     full_name = " ".join(data.get("account_name", "").split()).strip()
     first_middle = data.get("account_holder_name", "").strip()
     last = data.get("account_holder_surname", "").strip()
-
     # Build the expected full name. (We assume account_holder_name may already contain first and middle.)
     expected_full_name = f"{first_middle} {last}".strip()
     return full_name == expected_full_name
@@ -29,7 +38,7 @@ def check_email_account(data):
     Checks that the email field contains an '@' symbol.
     Expected key: "email"
     """
-    return "@" in data.get("email", "")
+    return email_validator_address(data.get("email", ""))[0]
 
 
 def is_single_domicile_account(data):
@@ -53,7 +62,7 @@ def check_address_zip_account(data):
     return data.get("postal_code", "").strip() != ""
 
 
-def account_form_is_consistent(account_form):
+def account_form_is_consistent(data: dict):
     """
     Aggregates several checks for the account form using the adapted functions:
       - Name consistency (using account_name, account_holder_name, and account_holder_surname)
@@ -61,6 +70,7 @@ def account_form_is_consistent(account_form):
       - Single domicile (based on the country field)
       - Postal code is provided
     """
+    account_form = data.get("account", {})
     consistent_name = check_name_consistency_account(account_form)
     correct_email = check_email_account(account_form)
     single_domicile = is_single_domicile_account(account_form)

@@ -3,18 +3,20 @@ import re
 from pathlib import Path
 
 
-def wealth_is_consistent(description, profile):
+def wealth_is_consistent(data: dict) -> bool:
     """
     Checks if the 'Wealth Summary' in the description contains three separate sentences:
       - One sentence containing the savings value from profile["aum"]["savings"].
-      - One sentence containing the inheritance value from profile["aum"]["inheritance"] and all details 
+      - One sentence containing the inheritance value from profile["aum"]["inheritance"] and all details
         from profile["inheritance_details"].
       - One sentence containing all details for each real estate asset in profile["real_estate_details"].
-    
+
     If a particular group is not available in the profile, that group is skipped.
     If no groups are required, the function returns True.
     The groups that are found must be in three distinct sentences.
     """
+    description = data.get("description", {})
+    profile = data.get("profile", {})
     try:
         wealth_text = description["Wealth Summary"]
         # Split by newline characters and remove empty lines.
@@ -27,11 +29,11 @@ def wealth_is_consistent(description, profile):
     # ---- Group 1: Savings ----
     aum = profile.get("aum", {})
     savings = str(aum.get("savings", "")).strip()
-    if savings:   # Only require if provided.
+    if savings:  # Only require if provided.
         savings_idx = None
         for i, sentence in enumerate(sentences):
             # Use re.escape to avoid regex interpretation of any special characters.
-            if re.search(r'\b' + re.escape(savings) + r'\b', sentence):
+            if re.search(r"\b" + re.escape(savings) + r"\b", sentence):
                 savings_idx = i
                 break
         if savings_idx is None:
@@ -48,10 +50,12 @@ def wealth_is_consistent(description, profile):
         in_profession = str(inheritance_details.get("profession", "")).strip()
         inheritance_idx = None
         for i, sentence in enumerate(sentences):
-            if ( re.search(r'\b' + re.escape(inheritance) + r'\b', sentence)
-                 and re.search(r'\b' + re.escape(in_year) + r'\b', sentence)
-                 and re.search(r'\b' + re.escape(in_relationship) + r'\b', sentence)
-                 and re.search(r'\b' + re.escape(in_profession) + r'\b', sentence) ):
+            if (
+                re.search(r"\b" + re.escape(inheritance) + r"\b", sentence)
+                and re.search(r"\b" + re.escape(in_year) + r"\b", sentence)
+                and re.search(r"\b" + re.escape(in_relationship) + r"\b", sentence)
+                and re.search(r"\b" + re.escape(in_profession) + r"\b", sentence)
+            ):
                 inheritance_idx = i
                 break
         if inheritance_idx is None:
@@ -67,7 +71,7 @@ def wealth_is_consistent(description, profile):
             all_found = True
             for asset in real_estate_details:
                 asset_detail = str(asset).strip()
-                if asset_detail and not re.search(r'\b' + re.escape(asset_detail) + r'\b', sentence):
+                if asset_detail and not re.search(r"\b" + re.escape(asset_detail) + r"\b", sentence):
                     all_found = False
                     break
             if all_found:

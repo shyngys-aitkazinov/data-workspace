@@ -4,23 +4,26 @@ from datetime import datetime
 from pathlib import Path
 
 
-def age_is_consistent(description, profile):
+def age_is_consistent(data: dict):
     """
-    Checks if the declared age (found in description fields "Summary Note" or "Occupation History")
-    matches the age calculated from the birth date in profile using the fixed current date 2025-04-01.
+    Checks if the declared age (extracted from description fields "Summary Note" or "Occupation History")
+    matches the age calculated from the birth date in the profile. The profile is expected to have a top-level
+    "birth_date" key in ISO format "YYYY-MM-DD".
 
-    For profile:
-      - The birth date is expected to be found at profile["Client Information"]["Date of birth"].
-      - (If not found there, an alternate key "birth_date" is also checked.)
+    The declared age is looked for in the description fields by matching a pattern like "(\d+)\s+year old".
+    If no declared age is found, the function returns True.
 
-    For description:
-      - The function looks for a pattern like "(\d+)\s+year old" in the text
-        of either the "Summary Note" or "Occupation History" fields.
-      - If no declared age is found, the check returns True.
+    The age is calculated using a fixed current date of 2025-04-12.
+
+    Returns:
+        True if the declared age matches the calculated age or if no declared age is provided;
+        False otherwise.
     """
+    description = data.get("description", {})
+    profile = data.get("profile", {})
+
     # --- Extract declared age from description ---
     declared_age = None
-    # Try keys in description in order.
     for field in ["Summary Note", "Occupation History"]:
         text = description.get(field, "")
         match = re.search(r"(\d+)\s+year old", text)
@@ -28,29 +31,30 @@ def age_is_consistent(description, profile):
             declared_age = int(match.group(1))
             break
 
-    # If no declared age is found, nothing to check:
+    print(f"Declared age: {declared_age}")
+
+    # If no declared age is found, nothing to check; assume it's consistent.
     if declared_age is None:
         return True
 
-    # --- Extract actual birth date from profile ---
-    try:
-        # First, try to extract from the nested Client Information section.
-        if "Client Information" in profile and "Date of birth" in profile["Client Information"]:
-            birth_date_str = profile["Client Information"]["Date of birth"]
-        elif "birth_date" in profile:
-            birth_date_str = profile["birth_date"]
-        else:
-            return False
-
-        # Expecting ISO format YYYY-MM-DD.
-        birth_date = datetime.strptime(birth_date_str, "%Y-%m-%d").date()
-    except Exception:
+    # --- Extract birth date from profile ---
+    if "birth_date" in profile:
+        birth_date_str = profile["birth_date"]
+    else:
         return False
 
-    # --- Calculate age based on fixed current date ---
-    current_date = datetime.strptime("2025-04-01", "%Y-%m-%d").date()
+    try:
+        birth_date = datetime.strptime(birth_date_str, "%Y-%m-%d").date()
+    except Exception as e:
+        print(f"Error parsing birth_date: {e}")
+        return False
+
+    # --- Calculate age using the fixed current date "2025-04-12" ---
+    current_date = datetime.strptime("2025-04-12", "%Y-%m-%d").date()
     age = current_date.year - birth_date.year
     if (current_date.month, current_date.day) < (birth_date.month, birth_date.day):
         age -= 1
+
+    print(f"Calculated age: {age}")
 
     return declared_age == age
