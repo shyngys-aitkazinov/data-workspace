@@ -534,7 +534,7 @@ class Preprocessor:
                     account_pdf_bytes = pdf_file.read()
             account_parsed = self._extract_form_data_and_signature(account_pdf_bytes)
             output = {
-                "profile": profile_json,
+                "profile": transform_profile(profile_json),
                 "passport": passport_data,
                 "description": description_json,
                 "account": account_parsed,

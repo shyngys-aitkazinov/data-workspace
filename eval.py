@@ -69,6 +69,11 @@ def eval():
         print(f"Processing client {client_id}...")
         # Open and parse the file
         client_data, flag = prep(dataset_item)
+        # client_data = json.loads(client_data)
+
+        with open("my_json.json", "w", encoding="utf-8") as f:
+            json.dump(client_data, f, ensure_ascii=False, indent=2)
+
         pred = evaluator(client_data, flag=flag)
         label = "Accept" if client_id < 500 else "Reject"
         print(f"Client {client_id} prediction: {pred}, expected: {label}")
