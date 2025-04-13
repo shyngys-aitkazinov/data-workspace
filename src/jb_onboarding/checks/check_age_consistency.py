@@ -31,8 +31,6 @@ def age_is_consistent(data: dict):
             declared_age = int(match.group(1))
             break
 
-    print(f"Declared age: {declared_age}")
-
     # If no declared age is found, nothing to check; assume it's consistent.
     if declared_age is None:
         return True

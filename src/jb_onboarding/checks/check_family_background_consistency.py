@@ -48,11 +48,13 @@ def extract_family_background(background: str):
     return {"marital_status": profile_marital_status, "number_of_children": number}
 
 
-def family_background_is_consistent(description, profile):
+def family_background_is_consistent(data: dict):
     """
     Checks consistency between parsed family background and the client profile's marital status.
     """
     # Ensure cache directory exists
+    profile = data.get("profile", {})
+    description = data.get("description", {})
 
     if "Family Background" not in description:
         return False

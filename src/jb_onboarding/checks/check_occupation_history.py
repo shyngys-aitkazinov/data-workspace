@@ -3,7 +3,7 @@ import re
 from pathlib import Path
 
 
-def employment_is_consistent(data):
+def employment_is_consistent(data: dict) -> bool:
     """
     Verify if employment details in description match the profile's current employment data.
     Checks for:
@@ -20,9 +20,10 @@ def employment_is_consistent(data):
     except KeyError:
         return False
 
+    # print("sentences", sentences)
+
     # Filter out summary sentences containing experience duration
     filtered_sentences = [s for s in sentences if "years of experience" not in s.lower()]
-
     # Extract key employment data
     target_company = employment.get("company", "").lower().strip()
     start_year = str(employment.get("since", ""))

@@ -337,12 +337,13 @@ def transform_profile(raw):
     new_profile["higher_education"] = school
 
     # 8. Higher education and employment history: we default to empty lists (or add your parsing).
-    new_profile["employment_background"] = list(
+    tmp = list(
         filter(
             lambda x: x["since"] is not None,
             extract_employment_history_manual(bussiness_info),
         )
-    )[0]
+    )
+    new_profile["employment_background"] = tmp[0] if len(tmp) > 0 else {}
 
     # 9. AUM: for example, we map "Total Asset Under Management" (as savings) if available.
     new_profile["aum"] = {
@@ -404,19 +405,14 @@ class PassportParser:
         )
         self.tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
 
-    def __call__(self, path_to_passport: PathLike) -> str:
+    def __call__(self, path_to_passport: PathLike) -> tuple[dict, bool]:
         """
         Processes the passport image by loading and preprocessing it,
         then runs OCR inference to transcribe all the text visible in the image.
-
-        Args:
-            path_to_passport (PathLike): File path to the passport image.
-
-        Returns:
-            str: The transcribed text extracted from the passport image.
         """
         # Open the image and convert it to RGB.
         image = Image.open(path_to_passport).convert("RGB")
+        passport_data = {}
 
         # Define the transformations: resize to 448x448, convert to tensor, and normalize.
         transform = transforms.Compose(
@@ -449,31 +445,37 @@ class PassportParser:
             "  - MRZ line 2\n"
             "For any field that is missing in the image, use an empty string as the value. Do not include any extra keys or text outside of the JSON."
         )
+        output = None
+        flag = True
+        try:
+            # Use the model's chat method to generate the OCR transcription.
+            output = self.model.chat(
+                self.tokenizer, pixel_values, prompt, generation_config={"max_new_tokens": 512, "do_sample": False}
+            )
 
-        # Use the model's chat method to generate the OCR transcription.
-        output = self.model.chat(
-            self.tokenizer, pixel_values, prompt, generation_config={"max_new_tokens": 512, "do_sample": False}
-        )
+            # Decode the output and convert it to a JSON object.
+            passport_data = json.loads(output[8:-3])
+            flag = False
+        except Exception as e:
+            print(f"Error during OCR processing: {e}, {output}")
+            # Use the model's chat method to generate the OCR transcription.
 
-        # Decode the output and convert it to a JSON object.
-        passport_data = json.loads(output[8:-3])
+            try:
+                output = self.model.chat(
+                    self.tokenizer, pixel_values, prompt, generation_config={"max_new_tokens": 512, "do_sample": False}
+                )
 
-        # for key in passport_data:
-        #     if "Date" in key:
-        #         # Convert date strings to the format
-        #         date_str = passport_data[key]
-        #         if date_str:
-        #             try:
-        #                 passport_data[key] = datetime.strptime(date_str, "%d-%b-%Y")
-        #             except ValueError:
-        #                 print(f"Invalid date format for {key}: {date_str}")
+                # Decode the output and convert it to a JSON object.
+                passport_data = json.loads(output[8:-3])
+                flag = False
+            except Exception as e:
+                print(f"Second error during OCR processing: {e}, {output}")
 
         # get the signature
         signature = image.crop((239, 210, 359, 242)).tobytes()
-        image.crop((239, 213, 359, 242)).save("signature.png")
         passport_data["Signature"] = base64.b64encode(signature).decode("utf-8")
 
-        return passport_data
+        return passport_data, flag
 
 
 class Preprocessor:
@@ -498,7 +500,7 @@ class Preprocessor:
         description: FileInput | None = None,
         account: FileInput | None = None,
         profile: FileInput | None = None,
-    ) -> dict[str, Any]:
+    ) -> tuple[dict[str, Any], bool]:
         # Determine how to treat the zip archive itself.
         if path_to_zip is not None:
             # If we have a file path, derive temporary extraction dir from the name.
@@ -516,7 +518,7 @@ class Preprocessor:
                 # passport.png
                 if "passport.png" not in names:
                     raise FileNotFoundError("passport.png not found in the zip archive.")
-                passport_data = self.passport_parser(os.path.join(temp_dir, "passport.png"))
+                passport_data, flag = self.passport_parser(os.path.join(temp_dir, "passport.png"))
 
                 # description.txt
                 if "description.txt" not in names:
@@ -537,7 +539,7 @@ class Preprocessor:
                 "description": description_json,
                 "account": account_parsed,
             }
-            return output
+            return output, flag
         else:
             # Process profile.docx
             if isinstance(profile, bytes):
@@ -559,7 +561,7 @@ class Preprocessor:
                 passport_file = passport
             else:
                 passport_file = open(passport, "rb")
-            passport_data = self.passport_parser(passport_file)
+            passport_data, flag = self.passport_parser(passport_file)
             if not hasattr(passport, "read"):
                 passport_file.close()
 
@@ -587,12 +589,12 @@ class Preprocessor:
         account_parsed = self._extract_form_data_and_signature(account_pdf_bytes)
 
         output: dict[str, Any] = {
-            "profile": profile_json,
+            "profile": transform_profile(profile_json),
             "passport": passport_data,
             "description": description_json,
             "account": account_parsed,
         }
-        return output
+        return output, flag
 
     def _parse_tick_field(self, text):
         pattern = r"(☒|☐)\s*([^☒☐]+)"
@@ -715,7 +717,7 @@ class Preprocessor:
         mat = fitz.Matrix(zoom, zoom)
         try:
             pix = page.get_pixmap(matrix=mat, clip=target_rect)
-            pix.save("signature1.png")
+            # pix.save("signature1.png")
             png_bytes = pix.tobytes("png")
             return base64.b64encode(png_bytes).decode("utf-8")
 

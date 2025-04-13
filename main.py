@@ -1,4 +1,5 @@
 import base64
+import json
 import os
 import time
 import zipfile
@@ -7,7 +8,9 @@ from os import PathLike
 
 import requests
 
+from jb_onboarding.constants import default_rules
 from jb_onboarding.preprocessing import Preprocessor
+from jb_onboarding.validator import ClientValidator
 
 # Configuration - Replace these placeholders
 API_KEY = "A8wwei-7ZHtA2TUFRW5AMRiwoFRijgAaIYO0AR6qeDk"
@@ -81,8 +84,8 @@ def save_erroneous_sample(account, description, passport, profile, client_idx, l
     print(f"Erroneous sample saved to {zip_filename}")
 
 
-def get_decision(client_meta: dict):
-    return "Accept"  # Placeholder for decision logic
+def get_decision(evaluator, client_meta: dict, flag: bool = False) -> str:
+    return "Accept" if evaluator(client_meta, flag) else "Reject"
 
 
 def make_decision(session_id, client_id, decision):
@@ -106,6 +109,7 @@ def make_decision(session_id, client_id, decision):
 def main():
     os.makedirs("output", exist_ok=True)
     prep = Preprocessor()
+    evaluator = ClientValidator(default_rules)
 
     time_queue = deque([])
     game_idx = 0
@@ -130,14 +134,17 @@ def main():
             passport = base64.b64decode(client_data.get("passport"))
             profile = base64.b64decode(client_data.get("profile"))
 
-            client_meta = prep(
+            client_meta, flag = prep(
                 path_to_zip=None,
                 passport=passport,
                 description=description,
                 account=account,
                 profile=profile,
             )
-            decision = get_decision(client_meta)
+            with open("my_json.json", "w", encoding="utf-8") as f:
+                json.dump(client_meta, f, ensure_ascii=False, indent=2)
+
+            decision = get_decision(evaluator, client_meta, flag=flag)
             result, err = make_decision(session_id, client_id, decision)
             time_queue.append(time.time())
 

@@ -12,7 +12,7 @@ from jb_onboarding.checks.cross_check_passport_client_profile_form import client
 
 
 class ClientValidator:
-    def __init__(self, rules: list, model_id: str | None = None):
+    def __init__(self, rules: list, sign_model_id: str | None = None):
         """_summary_
             [
             'check_account_form',
@@ -53,12 +53,22 @@ class ClientValidator:
             else:
                 raise ValueError(f"Unknown rule: {rule}")
 
-        # self.model =
+    def __call__(self, all_client_data: dict, flag: bool = True) -> bool:
+        """
 
-    def validate(self, all_client_data: dict):
+        Args:
+            all_client_data (dict): client data dictionary containing all the necessary information
+            flag (bool, optional): to skip related to passport checkers Defaults to True.
+
+        Returns:
+            bool: Valid or not
+        """
         for checker in self.checkers:
+            print(checker.__name__)
+            print(checker(all_client_data))
+            if flag and "passport" in checker.__name__:
+                continue
             if not checker(all_client_data):
-                print(f"Validation failed for {checker.__name__}")
                 return False
 
         return True

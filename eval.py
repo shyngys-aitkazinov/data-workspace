@@ -4,9 +4,11 @@ import pathlib
 import re
 from os import PathLike
 from pathlib import Path
+from random import seed, shuffle
 
-from jb_onboarding.constants import DOCS
+from jb_onboarding.constants import DOCS, default_rules
 from jb_onboarding.preprocessing import Preprocessor
+from jb_onboarding.validator import ClientValidator
 
 DATA_PATH = Path(os.path.join(os.path.dirname(__file__), "data"))
 
@@ -46,7 +48,12 @@ def get_dataset(data_path: PathLike) -> list[tuple[int, pathlib.Path]]:
                 # If filenames might vary, you could handle that here,
                 # e.g. continue, log a warning, etc.
 
-    return sorted(paths)
+    # randomly sample 50  from first 500 and 50 from 500-1000
+    paths.sort(key=lambda x: x[0])
+    paths = paths[:50] + paths[950:1000]
+    seed(42)
+    # shuffle(paths)
+    return paths
 
 
 def eval():
@@ -56,24 +63,15 @@ def eval():
 
     print(dataset[0])
     prep = Preprocessor()
+    evaluator = ClientValidator(default_rules)
 
     for client_id, dataset_item in dataset:
-        if client_id == 1:
-            continue
         print(f"Processing client {client_id}...")
         # Open and parse the file
-        client_data = prep(dataset_item)
-
-        print(client_data)
-
-        with open(f"{client_id}.json", "w") as f:
-            # Assuming client_data is a dictionary or list that can be serialized to JSON
-            json.dump(client_data, f, indent=4)
-
-        break
-
-        # Placeholder for further processing of parsed data
-        print(f"Parsed data for client {client_id}: {parsed_data}")
+        client_data, flag = prep(dataset_item)
+        pred = evaluator(client_data, flag=flag)
+        label = "Accept" if client_id < 500 else "Reject"
+        print(f"Client {client_id} prediction: {pred}, expected: {label}")
 
 
 if __name__ == "__main__":

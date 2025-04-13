@@ -12,7 +12,7 @@ COUNTRIES = {
     "Bulgaria": ["BGR", "Bulgarian"],
     "Croatia": ["HRV", "Croatian"],
     "Cyprus": ["CYP", "Cypriot"],
-    "Czechia": ["CZE", "Czech"],
+    "Czech Republic": ["CZE", "Czech"],
     "Denmark": ["DNK", "Danish"],
     "Estonia": ["EST", "Estonian"],
     "Finland": ["FIN", "Finnish"],
@@ -35,3 +35,17 @@ COUNTRIES = {
     "Spain": ["ESP", "Spanish"],
     "Sweden": ["SWE", "Swedish"],
 }
+
+
+default_rules = [
+    "check_account_form",
+    "check_age_consistency",
+    # "check_education_background",
+    "check_family_background_consistency",
+    "check_passport",
+    # "check_occupation_history",
+    "check_profile",
+    "cross_check_account_form_client_profile",
+    "cross_check_account_form_passport",
+    "cross_check_passport_client_profile_form",
+]

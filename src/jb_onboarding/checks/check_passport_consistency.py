@@ -6,7 +6,7 @@ from pathlib import Path
 from jb_onboarding.constants import COUNTRIES
 
 
-def passport_is_consistent(data: dict) -> bool:
+def passport_is_consistent(data: dict, max_levenshtein: int = 5) -> bool:
     passport = data.get("passport", {})
 
     # --- Validate core fields exist ---
@@ -34,7 +34,7 @@ def passport_is_consistent(data: dict) -> bool:
     country_code = passport["Code"].strip().upper()
     nationality = passport["Citizenship"].split("/")[0].strip().title()
     country = passport["Country"].strip()
-
+    passport_number = passport["Passport Number"].strip().upper()
     # Validate country code and nationality match
     try:
         country_data = COUNTRIES[country]
@@ -44,30 +44,10 @@ def passport_is_consistent(data: dict) -> bool:
             return False
     except KeyError:
         return False
-
     # --- MRZ Line 1 processing ---
-    mrz_line1 = passport["MRZ Line 1"].upper()
 
-    # Validate MRZ structure
-    if not mrz_line1.startswith(f"P<{country_code}"):
-        return False
-
-    # Extract name components using any combination of < or >
-    mrz_parts = re.split(r"[<>]+", mrz_line1[5:])  # Skip P< + country_code
-    mrz_parts = [p.strip() for p in mrz_parts if p.strip()]
-    if not mrz_parts:
-        return False
-
-    # Compare names with passport data
-    mrz_surname = mrz_parts[0]
-    mrz_given_names = " ".join(mrz_parts[1:]) if len(mrz_parts) > 1 else ""
-    if last_name != mrz_surname or given_name != mrz_given_names:
-        return False
-
-    # --- MRZ Line 2 validation ---
-    mrz_line2 = passport["MRZ Line 2"].upper()
-    passport_number = passport["Passport Number"].strip().upper()
-
+    mrz_together = passport["MRZ Line 1"].upper() + passport["MRZ Line 2"].upper()
+    mrz_together = re.sub(r"[<>\s]", "", mrz_together)
     # Date parsing and formatting
     try:
         birth_date = datetime.strptime(passport["Birth Date"], "%d-%b-%Y")
@@ -76,8 +56,6 @@ def passport_is_consistent(data: dict) -> bool:
 
     # Build expected MRZ components
     expected_start = f"{passport_number}{country_code}{birth_date.strftime('%y%m%d')}"
-    if not mrz_line2.startswith(expected_start):
-        return False
 
     # --- Date validity checks ---
     try:

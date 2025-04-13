@@ -30,6 +30,7 @@ def client_profile_and_passport_are_consistent(data: dict) -> bool:
                 return None
 
     # Birth date
+
     profile_dob = normalize_date(profile.get("birth_date", ""))
     passport_dob = normalize_date(passport.get("Birth Date", ""))
     if profile_dob != passport_dob:
