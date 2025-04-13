@@ -21,7 +21,7 @@ BASE_URL = "https://hackathon-api.mlo.sehlat.io"
 RATE_LIMIT = 60
 
 
-def check_rate_limit(time_queue: deque, sleep_time: int = 2):
+def check_rate_limit(time_queue: deque, sleep_time: int = 3):
     """
     Checks whether the rate limit of 60 calls per minute has been reached.
     If so, sleeps until the current minute window has passed.

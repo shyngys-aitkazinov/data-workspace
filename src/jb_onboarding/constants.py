@@ -42,10 +42,10 @@ default_rules = [
     "check_age_consistency",
     # "check_education_background",
     "check_family_background_consistency",
-    # "check_passport",
+    "check_passport",
     # "check_occupation_history",
     "check_profile",
     "cross_check_account_form_client_profile",
-    # "cross_check_account_form_passport",
-    # "cross_check_passport_client_profile_form",
+    "cross_check_account_form_passport",
+    "cross_check_passport_client_profile_form",
 ]

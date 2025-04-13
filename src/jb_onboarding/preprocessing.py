@@ -415,65 +415,65 @@ class PassportParser:
         passport_data = {}
 
         # Define the transformations: resize to 448x448, convert to tensor, and normalize.
-        # transform = transforms.Compose(
-        #     [
-        #         transforms.Resize((448, 448)),
-        #         transforms.ToTensor(),
-        #         transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
-        #     ]
-        # )
+        transform = transforms.Compose(
+            [
+                transforms.Resize((448, 448)),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+            ]
+        )
 
-        # # Apply the transformations and add a batch dimension.
-        # image_tensor = transform(image)
-        # pixel_values = image_tensor.unsqueeze(0).to(self.device)  # Shape: [1, 3, 448, 448]
+        # Apply the transformations and add a batch dimension.
+        image_tensor = transform(image)
+        pixel_values = image_tensor.unsqueeze(0).to(self.device)  # Shape: [1, 3, 448, 448]
 
-        # # Prepare the OCR prompt using the special <image> token.
-        # prompt = (
-        #     "<image>\n"
-        #     "Please extract the text from the passport image and output the information in a valid JSON object with exactly the following keys:\n"
-        #     "  - Country\n"
-        #     "  - Surname\n"
-        #     "  - Code\n"
-        #     "  - Passport Number\n"
-        #     "  - Given Name\n"
-        #     "  - Birth Date\n"
-        #     "  - Citizenship\n"
-        #     "  - Sex\n"
-        #     "  - Issue Date\n"
-        #     "  - Expiry Date\n"
-        #     "  - MRZ line 1\n"
-        #     "  - MRZ line 2\n"
-        #     "For any field that is missing in the image, use an empty string as the value. Do not include any extra keys or text outside of the JSON."
-        # )
-        # output = None
+        # Prepare the OCR prompt using the special <image> token.
+        prompt = (
+            "<image>\n"
+            "Please extract the text from the passport image and output the information in a valid JSON object with exactly the following keys:\n"
+            "  - Country\n"
+            "  - Surname\n"
+            "  - Code\n"
+            "  - Passport Number\n"
+            "  - Given Name\n"
+            "  - Birth Date\n"
+            "  - Citizenship\n"
+            "  - Sex\n"
+            "  - Issue Date\n"
+            "  - Expiry Date\n"
+            "  - MRZ line 1\n"
+            "  - MRZ line 2\n"
+            "For any field that is missing in the image, use an empty string as the value. Do not include any extra keys or text outside of the JSON."
+        )
+        output = None
         flag = True
-        # try:
-        #     # Use the model's chat method to generate the OCR transcription.
-        #     output = self.model.chat(
-        #         self.tokenizer, pixel_values, prompt, generation_config={"max_new_tokens": 512, "do_sample": False}
-        #     )
+        try:
+            # Use the model's chat method to generate the OCR transcription.
+            output = self.model.chat(
+                self.tokenizer, pixel_values, prompt, generation_config={"max_new_tokens": 512, "do_sample": False}
+            )
 
-        #     # Decode the output and convert it to a JSON object.
-        #     passport_data = json.loads(output[8:-3])
-        #     flag = False
-        # except Exception as e:
-        #     print(f"Error during OCR processing: {e}, {output}")
-        #     # Use the model's chat method to generate the OCR transcription.
+            # Decode the output and convert it to a JSON object.
+            passport_data = json.loads(output[8:-3])
+            flag = False
+        except Exception as e:
+            print(f"Error during OCR processing: {e}, {output}")
+            # Use the model's chat method to generate the OCR transcription.
 
-        #     try:
-        #         output = self.model.chat(
-        #             self.tokenizer, pixel_values, prompt, generation_config={"max_new_tokens": 512, "do_sample": False}
-        #         )
+            try:
+                output = self.model.chat(
+                    self.tokenizer, pixel_values, prompt, generation_config={"max_new_tokens": 512, "do_sample": False}
+                )
 
-        #         # Decode the output and convert it to a JSON object.
-        #         passport_data = json.loads(output[8:-3])
-        #         flag = False
-        #     except Exception as e:
-        #         print(f"Second error during OCR processing: {e}, {output}")
+                # Decode the output and convert it to a JSON object.
+                passport_data = json.loads(output[8:-3])
+                flag = False
+            except Exception as e:
+                print(f"Second error during OCR processing: {e}, {output}")
 
-        # # get the signature
-        # signature = image.crop((239, 210, 359, 242)).tobytes()
-        # passport_data["Signature"] = base64.b64encode(signature).decode("utf-8")
+        # get the signature
+        signature = image.crop((239, 210, 359, 242)).tobytes()
+        passport_data["Signature"] = base64.b64encode(signature).decode("utf-8")
 
         return passport_data, flag
 
