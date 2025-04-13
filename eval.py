@@ -6,6 +6,8 @@ from os import PathLike
 from pathlib import Path
 from random import seed, shuffle
 
+from sklearn.metrics import classification_report
+
 from jb_onboarding.constants import DOCS, default_rules
 from jb_onboarding.preprocessing import Preprocessor
 from jb_onboarding.validator import ClientValidator
@@ -82,6 +84,9 @@ def eval():
         label = 1 if client_id < 500 else 0
         labels.append(label)
         print(f"Client {client_id} prediction: {pred}, expected: {label}")
+
+    # Calculate accuracy
+    print(classification_report(labels, preds, target_names=["Accept", "Reject"]))
 
 
 if __name__ == "__main__":
