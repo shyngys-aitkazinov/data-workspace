@@ -1,5 +1,7 @@
 import re
 
+from unidecode import unidecode
+
 
 def account_form_and_passport_are_consistent(data: dict) -> bool:
     """
@@ -27,8 +29,8 @@ def account_form_and_passport_are_consistent(data: dict) -> bool:
     passport = data.get("passport", {})
     # --- Extract name parts from the account form ---
     # Prefer to use the keys "account_holder_name" and "account_holder_surname" if available.
-    account_holder_name = account.get("account_holder_name", "").strip()
-    account_holder_surname = account.get("account_holder_surname", "").strip()
+    account_holder_name = unidecode(account.get("account_holder_name", "").strip())
+    account_holder_surname = unidecode(account.get("account_holder_surname", "").strip())
 
     if account_holder_name and account_holder_surname:
         # Use the first token of the account_holder_name as the first name.
@@ -36,9 +38,9 @@ def account_form_and_passport_are_consistent(data: dict) -> bool:
         acc_last = account_holder_surname.lower()
     else:
         # Fall back to splitting "name" (or "account_name")
-        full_name = account.get("name", account.get("account_name", "")).strip()
+        full_name = unidecode(account.get("name", account.get("account_name", "")).strip())
         name_parts = full_name.split()
-        print(f"Full name parts: {name_parts}")
+        # print(f"Full name parts: {name_parts}")
         if len(name_parts) < 2:
             return False  # Not enough parts to form a valid first and last name.
         acc_first = name_parts[0].lower()
@@ -46,14 +48,15 @@ def account_form_and_passport_are_consistent(data: dict) -> bool:
 
     # --- Extract name parts from the passport ---
     # Passport: first name(s) come from "Given Name" and last name from "Surname"
-    given_name_pass = passport.get("Given Name", "").strip().lower()
-    print(f"Given name from passport: {given_name_pass}")
+    given_name_pass = unidecode(passport.get("Given Name", "").strip().lower())
+    # print(f"Given name from passport: {given_name_pass}")
+
     if not given_name_pass:
         return False
     pass_first = given_name_pass.split()[0]  # Compare only the first token.
     pass_last = passport.get("Surname", "").strip().lower()
-    print(f"Last name from passport: {pass_last}")
-    print(f"Account first name: {acc_first}, Account last name: {acc_last}")
+    # print(f"Last name from passport: {pass_last}")
+    # print(f"Account first name: {acc_first}, Account last name: {acc_last}")
     # --- Compare names ---
     if acc_first != pass_first:
         return False
@@ -69,7 +72,7 @@ def account_form_and_passport_are_consistent(data: dict) -> bool:
 
     pass_passport = passport.get("Passport Number", "").strip()
 
-    if acc_passport != pass_passport:
+    if acc_passport.upper() != pass_passport.upper():
         return False
 
     return True

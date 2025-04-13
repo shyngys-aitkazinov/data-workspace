@@ -65,6 +65,9 @@ def eval():
     prep = Preprocessor()
     evaluator = ClientValidator(default_rules)
 
+    preds = []
+    labels = []
+
     for client_id, dataset_item in dataset:
         print(f"Processing client {client_id}...")
         # Open and parse the file
@@ -75,7 +78,9 @@ def eval():
             json.dump(client_data, f, ensure_ascii=False, indent=2)
 
         pred = evaluator(client_data, flag=flag)
-        label = "Accept" if client_id < 500 else "Reject"
+        preds.append(int(pred))
+        label = 1 if client_id < 500 else 0
+        labels.append(label)
         print(f"Client {client_id} prediction: {pred}, expected: {label}")
 
 

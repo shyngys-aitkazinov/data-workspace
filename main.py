@@ -141,8 +141,8 @@ def main():
                 account=account,
                 profile=profile,
             )
-            with open("my_json.json", "w", encoding="utf-8") as f:
-                json.dump(client_meta, f, ensure_ascii=False, indent=2)
+            # with open("my_json.json", "w", encoding="utf-8") as f:
+            #     json.dump(client_meta, f, ensure_ascii=False, indent=2)
 
             decision = get_decision(evaluator, client_meta, flag=flag)
             result, err = make_decision(session_id, client_id, decision)
@@ -150,7 +150,7 @@ def main():
 
             if result.get("status", "OK") == "gameover":
                 label = "Accept" if decision == "Reject" else "Reject"
-                save_erroneous_sample(account, description, passport, profile, client_idx, label)
+                # save_erroneous_sample(account, description, passport, profile, client_idx, label)
                 game_idx += 1
                 client_idx += 1
                 break
