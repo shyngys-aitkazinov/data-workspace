@@ -9,16 +9,22 @@ In private banking, the onboarding process requires verifying client information
 ```bash
 ├── LICENSE
 ├── README.md                        # You're reading this!
-├── data
-│   └── ...
-├── main.py                          # Main script or entry point
+│ jb_onboarding
+│     ├── checks
+│     ├── constants.py
+│     ├── preprocessing.py
+│     └── validator.py
+├── main.py  
+├── eval.py               # Main script or entry point
 ├── notebooks
 │   └── test_prediction.ipynb
 ├── pyproject.toml                   # Project 
-└── uv.lock                          # uv-specific lock file
+└── uv.lock
+                          # uv-specific lock file
 ```
 - **`notebooks/`**: Jupyter notebooks for exploration and prototyping.
-- **`main.py`**: Example script or possible CLI entry point.
+- **`main.py`**: Main script for playing the game.
+- **`eval.py`**: Script for evaluating the model.
 - **`pyproject.toml`**: Defines project requirements, build system, and metadata.
 
 ## Prerequisites

@@ -63,21 +63,13 @@ class ClientValidator:
         Returns:
             bool: Valid or not
         """
-        score = 0
         for checker in self.checkers:
             print(checker.__name__)
-            # print(checker(all_client_data))
             if flag and "passport" in checker.__name__:
-                # print("skip")
                 continue
-            valid = checker(all_client_data)
+            is_valid = checker(all_client_data)
 
-            if not valid and "passport" in checker.__name__:
-                score += 0.3
-            elif not valid:
-                score += 1.0
-
-        if score >= 1.0:
-            return False
+            if not is_valid:
+                return False
 
         return True

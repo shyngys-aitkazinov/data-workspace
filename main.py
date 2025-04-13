@@ -1,11 +1,10 @@
 import base64
-import json
 import os
 import time
 import zipfile
 from collections import deque
-from os import PathLike
 
+import numpy as np
 import requests
 
 from jb_onboarding.constants import default_rules
@@ -13,7 +12,7 @@ from jb_onboarding.preprocessing import Preprocessor
 from jb_onboarding.validator import ClientValidator
 
 # Configuration - Replace these placeholders
-API_KEY = "A8wwei-7ZHtA2TUFRW5AMRiwoFRijgAaIYO0AR6qeDk"
+API_KEY = "API_KEY"
 TEAM_NAME = "HANGUK ML"
 BASE_URL = "https://hackathon-api.mlo.sehlat.io"
 
@@ -118,8 +117,6 @@ def main():
     client_idx = max(client_idx) + 1 if client_idx else 1
 
     while True:
-        # input("Press Enter to continue the game...")
-
         # Start the game session
         session_id, client_id, score, client_data = start_game_session()
 
@@ -141,8 +138,6 @@ def main():
                 account=account,
                 profile=profile,
             )
-            # with open("my_json.json", "w", encoding="utf-8") as f:
-            #     json.dump(client_meta, f, ensure_ascii=False, indent=2)
 
             decision = get_decision(evaluator, client_meta, flag=flag)
             result, err = make_decision(session_id, client_id, decision)
@@ -163,7 +158,6 @@ def main():
                 score = result.get("score")
                 client_id = result.get("client_id")
             # save_erroneous_sample(account, description, passport, profile, client_idx, decision)
-            # client_idx += 1
             print(f"Game {game_idx} - score {score}")
 
 
