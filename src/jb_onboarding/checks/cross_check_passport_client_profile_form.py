@@ -1,52 +1,62 @@
+from datetime import datetime
+
+
 def client_profile_and_passport_are_consistent(data: dict) -> bool:
-    passport = data.get("passport", {})
+    """Check consistency between client profile and passport data with new structure"""
     profile = data.get("profile", {})
-    # --- Extract passport data ---
-    # Passport keys in the new format: "Given Name" and "Surname".
-    given_name = passport.get("Given Name", "").strip()
-    name_parts = given_name.split()
-    passport_first_name = name_parts[0] if name_parts else ""
-    passport_middle_name = " ".join(name_parts[1:]) if len(name_parts) > 1 else ""
-    passport_last_name = passport.get("Surname", "").strip()
+    passport = data.get("passport", {})
 
-    # Construct full name variations.
-    if passport_middle_name:
-        passport_full_name = f"{passport_first_name} {passport_middle_name} {passport_last_name}".strip()
-    else:
-        passport_full_name = f"{passport_first_name} {passport_last_name}".strip()
-    # Here, passport_full_name_no_space is the same (we already trimmed extra spaces)
-    passport_full_name_no_space = passport_full_name
+    # Name comparison
+    profile_name = profile.get("name", "").strip().upper()
+    passport_surname = passport.get("Surname", "").strip().upper()
+    passport_given = passport.get("Given Name", "").strip().upper()
 
-    # Other passport fields.
-    passport_birth_date_str = passport.get("Birth Date", "").strip()
-    passport_gender = passport.get("Sex", "").strip()
-    passport_nationality = passport.get("Citizenship", "").strip()
-    passport_number = passport.get("Passport Number", "").strip()
-    passport_issue_date_str = passport.get("Issue Date", "").strip()
-    passport_expiry_date_str = passport.get("Expiry Date", "").strip()
+    # Split profile name into components
+    profile_parts = profile_name.split()
+    passport_parts = f"{passport_given} {passport_surname}".split()
 
-    # --- Extract client profile data from the new flat structure ---
-    profile_full_name = profile.get("name", "").strip()
-    profile_birth_date_str = profile.get("birth_date", "").strip()
-    profile_nationality = profile.get("nationality", "").strip()
-    profile_gender = profile.get("gender", "").strip()
-    profile_passport_number = profile.get("passport_number", "").strip()
-    profile_issue_date_str = profile.get("passport_issue_date", "").strip()
-    profile_expiry_date_str = profile.get("passport_expiry_date", "").strip()
+    # Compare all name components regardless of order
+    if sorted(profile_parts) != sorted(passport_parts):
+        return False
 
-    # --- Check for consistency ---
-    # Compare full names.
-    if passport_full_name != profile_full_name and passport_full_name_no_space != profile_full_name:
+    # Date comparison with format normalization
+    def normalize_date(date_str):
+        try:
+            return datetime.strptime(date_str, "%Y-%m-%d").date()
+        except ValueError:
+            try:
+                return datetime.strptime(date_str, "%d-%b-%Y").date()
+            except:
+                return None
+
+    # Birth date
+    profile_dob = normalize_date(profile.get("birth_date", ""))
+    passport_dob = normalize_date(passport.get("Birth Date", ""))
+    if profile_dob != passport_dob:
         return False
-    if passport_birth_date_str != profile_birth_date_str:
+
+    # Gender comparison
+    gender_mapping = {"M": "MALE", "F": "FEMALE"}
+    profile_gender = gender_mapping.get(profile.get("gender", "").upper(), "")
+    passport_gender = passport.get("Sex", "").upper()
+    if profile_gender and passport_gender:
+        if profile_gender not in passport_gender and passport_gender not in profile_gender:
+            return False
+
+    # Nationality comparison
+    profile_nationality = profile.get("nationality", "").upper()
+    passport_nationality = passport.get("Citizenship", "").split("/")[0].strip().upper()
+    if profile_nationality != passport_nationality:
         return False
-    if passport_gender != profile_gender:
+
+    # Passport number comparison
+    if profile.get("passport_number", "").upper() != passport.get("Passport Number", "").upper():
         return False
-    if passport_nationality != profile_nationality:
-        return False
-    if passport_number != profile_passport_number:
-        return False
-    if passport_issue_date_str != profile_issue_date_str or passport_expiry_date_str != profile_expiry_date_str:
+
+    # Date validity check
+    today = datetime.today().date()
+    expiry = normalize_date(passport.get("Expiry Date", ""))
+    if not expiry or expiry <= today:
         return False
 
     return True
